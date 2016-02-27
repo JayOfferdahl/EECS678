@@ -65,6 +65,15 @@ bool get_command(command_t* cmd, FILE* in) {
 }
 
 /**
+ * Command handler
+ *
+ * @param cmdstr the input from the command line
+ */
+void handle_cmd(command_t cmd) {
+  puts(cmd.cmdstr); // Echo the input string
+}
+
+/**
  * Quash entry point
  *
  * @param argc argument count from the command line
@@ -77,7 +86,7 @@ int main(int argc, char** argv) {
   start();
   
   puts("Welcome to Quash!");
-  puts("Type \"exit\" to quit");
+  puts("Type \"exit\" or \"quit\" to quit");
 
   // Main execution loop
   while (is_running() && get_command(&cmd, stdin)) {
@@ -85,10 +94,12 @@ int main(int argc, char** argv) {
     // this while loop. It is just an example.
 
     // The commands should be parsed, then executed.
-    if (!strcmp(cmd.cmdstr, "exit"))
+    if (!strcmp(cmd.cmdstr, "exit") || !strcmp(cmd.cmdstr, "quit")) {
+      puts("Exiting...");
       terminate(); // Exit Quash
-    else 
-      puts(cmd.cmdstr); // Echo the input string
+    }
+    else
+      handle_cmd(cmd);
   }
 
   return EXIT_SUCCESS;

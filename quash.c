@@ -13,6 +13,9 @@
 
 #include <string.h>
 #include <ctype.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdio.h>
 
 /**************************************************************************
  * Private Variables
@@ -117,13 +120,50 @@ int parse_cmd(command_t* cmd, char** args, int numCmds) {
 }
 
 /**
- * Command handler
+ * Prints the current working directory
+ */
+void pwd() {
+  char cwd[1024];
+  getcwd(cwd, 1024);
+
+  printf("%s\n", cwd);
+}
+
+/**
+ * Changes the current working directory to the input directory, or
+ * HOME if no directory is given
+ *
+ * @param target - the input to change directories to
+ */
+void cd(char* target) {
+  // Change directory to the HOME variable
+  if(!target) {
+    if(chdir(getenv("HOME")) == -1)
+      printf("quash: cd: %s: No such file or directory\n", getenv("HOME"));
+
+    pwd();
+  }
+  else if(chdir(target) == -1)
+    printf("quash: cd: %s: No such file or directory\n", target);
+    // Print out the current working directory
+  else
+    pwd();
+}
+
+/**
+ * Handles the input command by tokenizing the string and executing functions
+ * based on the input
  *
  * @param cmdstr the input from the command line
  */
 void handle_cmd(command_t cmd) {
-  int NUM_CMDS = 20;
+  int NUM_CMDS = 20, i;
   char *args[NUM_CMDS];
+
+  // Initialize all args to null
+  for(i = 0; i < NUM_CMDS; i++)
+    args[i] = NULL;
+
   int argCount = parse_cmd(&cmd, args, NUM_CMDS);
 
   if(argCount > NUM_CMDS) {
@@ -133,10 +173,19 @@ void handle_cmd(command_t cmd) {
   else if(argCount == 0) {
     return;
   }
+
   // Main handler
 
-  if(strcmp(args[0], "")) {
-
+  // Print working directory (with args)
+  if(!strcmp(args[0], "pwd")) {
+    pwd();
+  }
+  // Change directory (with/without args)
+  else if(!strcmp(args[0], "cd")) {
+    cd(args[1]);
+  }
+  else {
+    printf("quash: %s: command not found...\n", args[0]);
   }
 }
 

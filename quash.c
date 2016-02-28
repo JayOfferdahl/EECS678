@@ -13,9 +13,7 @@
 
 #include <string.h>
 #include <ctype.h>
-#include <stdlib.h>
 #include <unistd.h>
-#include <stdio.h>
 
 /**************************************************************************
  * Private Variables
@@ -49,74 +47,37 @@ void terminate() {
   running = false;
 }
 
-bool get_command(command_t* cmd, FILE* in) {
-  if (fgets(cmd->cmdstr, MAX_COMMAND_LENGTH, in) != NULL) {
-    size_t len = strlen(cmd->cmdstr);
-    char last_char = cmd->cmdstr[len - 1];
-
-    if (last_char == '\n' || last_char == '\r') {
-      // Remove trailing new line character.
-      cmd->cmdstr[len - 1] = '\0';
-      cmd->cmdlen = len - 1;
-    }
-    else
-      cmd->cmdlen = len;
-    
-    return true;
-  }
-  else
-    return false;
-}
-
 /**
- * Parses the input string and splits it up based on whitespace
+ * Parses the input string by tokenizing it
  *
  * @param cmdstr the input from the command line
  * @return the number of arguments included in the command
  */
-int parse_cmd(command_t* cmd, char** args, int numCmds) {
-  int length = cmd->cmdlen, i, argStart, argEnd, endOfString, argCount;
-  argStart = argEnd = endOfString = argCount = 0;
+char** parse_cmd(char* cmd, int* numCmds) {
+  char** parsed = NULL;
+  char* current;
+  int spaces = 0;
 
-  char* string = (char *) malloc(length);
+  current = strtok(cmd, " ");
 
-  // Temporarily store the string
-  strcpy(string, cmd->cmdstr);
+  while(current) {
+    parsed = realloc(parsed, sizeof(char*) * ++spaces);
 
-  // Empty command
-  if(cmd->cmdlen == 0)
-    return argCount;
-
-  // Allow a max of 10 arguments
-  for(i = 0; i < numCmds && !endOfString; i++) {
-    while(!isspace(*string)) {
-      // If at the end of the string, break out
-      if(*string == 0) {
-        endOfString = true;
-        break;
-      }
-      argEnd++;
-      string++;
+    if(current == NULL) {
+      current++;
+      sprintf(current, "%s%s%s", current, " ", strtok(NULL, "\""));
     }
 
-    // If there's something to add
-    if(argEnd != argStart) {
-      length = argEnd - argStart;
+    parsed[spaces - 1] = current;
+    *numCmds = (*numCmds) + 1;
 
-      // Allocate memory in the input array
-      args[i] = malloc(length + 1);
-
-      strncpy(args[i], cmd->cmdstr + argStart, length);
-      args[i][length] = 0;
-      argCount++;
-    }
-    string++;
-    argEnd++;
-    argStart = argEnd;
+    current = strtok(NULL, " =");
   }
-  if(!endOfString)
-    argCount++;
-  return argCount;
+
+  parsed = realloc(parsed, sizeof(char*) * (spaces + 1));
+  parsed[spaces] = 0;
+
+  return parsed;
 }
 
 /**
@@ -151,31 +112,90 @@ void cd(char* target) {
 }
 
 /**
+ * Echos the requested input, if the user wants to view the HOME or PATH 
+ * variables, those values are printed out. If the second arguemtn is not
+ * one of these variables, all subsequent arguments are printed out
+ *
+ * @param argCount - the number of arguments inputed for this command
+ * @param args - the list of arguments inputed for this command
+ */
+void echo(char** args, int argCount) {
+  int i;
+  char* string;
+
+  for(i = 1; i < argCount; i++) {
+    if(!strcmp(args[i], "$HOME"))
+      string = getenv("HOME");
+    else if(!strcmp(args[i], "$PATH"))
+      string = getenv("PATH");
+    else
+      string = args[i];
+
+    printf("%s ", string);
+  }
+
+  printf("\n");
+}
+
+/**
+ * Sets the system variables HOME or PATH to the desired location
+ *
+ * @param args - the list of arguments inputed for this command
+ */
+void set(char** args, int argCount) {
+  if(argCount < 3)
+      printf("quash: set: Too few arguments: Expected 3, received %i\n", argCount);
+  else {
+    char* var = args[1];
+    char* value = args[2];
+
+    // Check for valid input
+    if(strcmp(var, "PATH") && strcmp(var, "HOME")) {
+      printf("quash: set: %s: Invalid system variable.\nProper usage: set HOME=/.../ or set PATH=/.../\n", var);
+      return;
+    }
+
+    // Check to make sure it was set correctly
+    if(!strcmp(getenv(var), value))
+      printf("%s is already set to %s\n", var, value);
+    else {
+      setenv(var, value, 1);
+      printf("%s was set to %s\n", var, value);
+    }
+  }
+}
+
+/**
+ * Execute the function with its arguments
+ *
+ * @param args - the list of arguments inputed for this command
+ */
+void execute(char** args, int argCount) {
+  // If we're not in absolute path format, search the PATH variable
+  if(args[0][0] != '.') {
+
+
+    printf("quash: %s: command not found...\n", args[0]);
+  }
+  else {
+    printf("quash: %s: No such file or directory\n", args[0]);
+  }  
+}
+
+/**
  * Handles the input command by tokenizing the string and executing functions
  * based on the input
  *
  * @param cmdstr the input from the command line
  */
-void handle_cmd(command_t cmd) {
-  int NUM_CMDS = 20, i;
-  char *args[NUM_CMDS];
+void handle_cmd(char* cmd) {
+  int argCount = 0;
+  char** args = parse_cmd(cmd, &argCount);
 
-  // Initialize all args to null
-  for(i = 0; i < NUM_CMDS; i++)
-    args[i] = NULL;
-
-  int argCount = parse_cmd(&cmd, args, NUM_CMDS);
-
-  if(argCount > NUM_CMDS) {
-    printf("You've entered too many arguments. Please try again.\n");
+  if(argCount == 0)
     return;
-  }
-  else if(argCount == 0) {
-    return;
-  }
 
   // Main handler
-
   // Print working directory (with args)
   if(!strcmp(args[0], "pwd")) {
     pwd();
@@ -184,8 +204,22 @@ void handle_cmd(command_t cmd) {
   else if(!strcmp(args[0], "cd")) {
     cd(args[1]);
   }
+  // Echo 
+  else if(!strcmp(args[0], "echo")) {
+    echo(args, argCount);
+  }
+  // Set home/path variables
+  else if(!strcmp(args[0], "set")) {
+      set(args, argCount);
+  }
+  // Quit/Exit
+  else if(!strcmp(args[0], "exit") || !strcmp(args[0], "quit")) {
+    puts("Exiting...");
+    terminate(); // Exit quash
+  }
+  // Else, try to execute it
   else {
-    printf("quash: %s: command not found...\n", args[0]);
+    execute(args, argCount);
   }
 }
 
@@ -194,27 +228,21 @@ void handle_cmd(command_t cmd) {
  *
  * @param input - the string to be trimmed
  */
-void trim(command_t* cmd) {
-  int commandLength = cmd->cmdlen;
-
+void trim(char* cmd) {
   // Move pointer from front of string to first legit character
-  while(isspace(*cmd->cmdstr)) {
-    cmd->cmdstr++;
-    cmd->cmdlen--;
-  }
+  while(isspace(*cmd))
+    cmd++;
 
   // The string is empty
-  if(*cmd->cmdstr == 0)
+  if(*cmd == 0)
     return;
 
   // Find the back of the string
-  char* back = cmd->cmdstr + commandLength - 1;
+  char* back = cmd + strlen(cmd) - 1;
 
   // Move back pointer from back of string to last legit character
-  while(isspace(*back) && back > cmd->cmdstr) {
+  while(isspace(*back) && back > cmd) 
     back--;
-    cmd->cmdlen--;
-  }
 
   // Terminate the string
   *(back + 1) = 0;
@@ -227,29 +255,22 @@ void trim(command_t* cmd) {
  * @param argv argument vector from the command line
  * @return program exit status
  */
-int main(int argc, char** argv) { 
-  // #TODO --> on first program run, if a string longer than 25 characters is entered, seg fault... why?
-  command_t cmd; //< Command holder argument
-
+int main(int argc, char** argv) {
   start();
+
+  char* cmd, line[1024];
   
   puts("\nWelcome to Quash!");
   puts("Type \"exit\" or \"quit\" to quit\n");
-  printf("quash$> ");
   // Main execution loop
-  while (is_running() && get_command(&cmd, stdin)) {
-    // Trim down the command (leading & trailng white space)
-    trim(&cmd);
+  while (is_running()) {
+    snprintf(line, sizeof(line), "quash$> ");
 
-    // Terminate this program if the user wants to exit
-    if (!strcmp(cmd.cmdstr, "exit") || !strcmp(cmd.cmdstr, "quit")) {
-      puts("Exiting...");
-      terminate(); // Exit Quash
-    }
-    else {
-      // If we didn't terminate, parse the command
+    cmd = readline(line);
+    if(*cmd) {
+      // Trim down the command (leading & trailng white space)
+      trim(cmd);
       handle_cmd(cmd);
-      printf("quash$> ");
     }
   }
 

@@ -7,7 +7,18 @@
 #ifndef QUASH_H
 #define QUASH_H
 
-#include <stdbool.h>
+#include <stdbool.h> 
+#include <ctype.h>
+#include <sys/types.h>
+
+/**
+ * Struct to hold background processes
+ */
+struct job {
+  int jobid;  // The job ID stored in this job
+  pid_t pid;  // The process ID stored in this job
+  char *cmd;  // The command being run by this job
+};
 
 /**
  * Query if quash should accept more input or not.

@@ -19,18 +19,7 @@
 #include <sys/wait.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <ctype.h>
-#include <sys/types.h>
 #include <readline/readline.h>
-
-/**
- * Struct to hold background processes
- */
-struct job {
-  int jobid;  // The job ID stored in this job
-  pid_t pid;  // The process ID stored in this job
-  char *cmd;  // The command being run by this job
-};
 
 static int numJobs;
 static struct job jobList[100];
@@ -359,7 +348,9 @@ void execute_in_background(char** args, int argCount) {
     // Execute the function normally
     execute(args, argCount);
 
-    printf("\n[%i] %d finished %s\nquash$>", numJobs + 1, getpid(), args[0]);
+    printf("\n[%i] %d finished %s\n", numJobs + 1, getpid(), args[0]);
+
+    exit(0);
   }
   // Parent process
   else {

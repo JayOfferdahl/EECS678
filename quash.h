@@ -101,4 +101,12 @@ void handle_cmd(char* cmd);
  */
 void trim(char* cmd);
 
+/**
+ * Implements I/O redirection to write or read command output to/from a file
+ *
+ * @param args - the list of arguments inputted for this command
+ * @param argCount - the number of arguments inputted for this command
+ */
+void ioRedirect(char *cmd, char **args, int argCount);
+
 #endif // QUASH_H

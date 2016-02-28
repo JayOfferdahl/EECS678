@@ -349,6 +349,134 @@ void execute(char** args, int argCount) {
     printf("quash: %s: command not found...\n", args[0]); 
 }
 
+void ioRedirect(char* cmd, char ** args, int argCount)
+{
+  // Redirect standard input from a file
+  if (strchr(cmd, '<') != NULL)
+  {
+    int status;
+
+    // Get fully qualified path to file to be written to 
+    char fileName[1024];
+    getcwd(fileName, 1024);
+    strcat(fileName, "/");
+
+    char *buffer = get_path_exec(args[0]);
+    
+    // Get number of args on LHS of the carrot
+    char *tokenizedCmd;
+    tokenizedCmd = strtok(cmd, " ");
+
+    int counter = 0;
+    while (tokenizedCmd != NULL)
+    {
+      if (strcmp(tokenizedCmd, "<") == 0)
+      {
+        tokenizedCmd = strtok(NULL, " ");
+        strcat (fileName, tokenizedCmd);
+        tokenizedCmd = NULL;
+      }
+      else
+      {
+        counter++;
+        tokenizedCmd = strtok(NULL, " ");
+      }
+    }
+
+    char *argv[1024];
+
+    for (int i = 0; i < counter; i++)
+    {
+      argv[i] = args[i];
+    }
+    argv[counter] = NULL;
+
+    pid_t pid;
+    pid = fork();
+
+    // child process
+    if (pid == 0)
+    {
+      // File is open to write to
+      freopen(fileName, "r", stdin);
+
+      if (execv(buffer, argv) < 0)
+      {
+        fprintf(stderr, "\nError executing function. ERROR%d\n", errno);
+        return;
+      }
+
+      // Close stdin
+      fclose(stdin);
+    }
+    else if((waitpid(pid, &status, 0)) == -1) {
+      fprintf(stderr, "Process 1 encountered an error. ERROR%d", errno);
+    }
+  }
+  // Redirect standard output to a file
+  else
+  {
+    int status;
+    
+    // Get fully qualified path to file to be written to 
+    char fileName[1024];
+    getcwd(fileName, 1024);
+    strcat(fileName, "/");
+
+    char *buffer = get_path_exec(args[0]);
+    
+    // Get number of args on LHS of the carrot
+    char *tokenizedCmd;
+    tokenizedCmd = strtok(cmd, " ");
+
+    int counter = 0;
+    while (tokenizedCmd != NULL)
+    {
+      if (strcmp(tokenizedCmd, ">") == 0)
+      {
+        tokenizedCmd = strtok(NULL, " ");
+        strcat (fileName, tokenizedCmd);
+        tokenizedCmd = NULL;
+      }
+      else
+      {
+        counter++;
+        tokenizedCmd = strtok(NULL, " ");
+      }
+    }
+
+    char *argv[1024];
+
+    for (int i = 0; i < counter; i++)
+    {
+      argv[i] = args[i];
+    }
+    argv[counter] = NULL;
+
+    pid_t pid;
+    pid = fork();
+
+    // child process
+    if (pid == 0)
+    {
+      // File is open to write to
+      freopen(fileName, "w", stdout);
+
+      if (execv(buffer, argv) < 0)
+      {
+        fprintf(stderr, "\nError executing function. ERROR%d\n", errno);
+        return;
+      }
+
+      // Close stdout to file
+      fclose(stdout);
+    }
+    else if((waitpid(pid, &status, 0)) == -1) {
+      fprintf(stderr, "Process 1 encountered an error. ERROR%d", errno);
+    }
+  }
+}
+
 /**
  * Handles the input command by tokenizing the string and executing functions
  * based on the input
@@ -368,8 +496,13 @@ void handle_cmd(char* cmd) {
     return;
 
   // Main handler
+
+  if(strchr(cmd, '<') != NULL || strchr(cmd, '>') != NULL)
+  {
+    ioRedirect(cmd, args, argCount);
+  }
   // Print working directory (with args)
-  if(!strcmp(args[0], "pwd")) {
+  else if(!strcmp(args[0], "pwd")) {
     pwd();
   }
   // Change directory (with/without args)

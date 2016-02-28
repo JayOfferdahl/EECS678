@@ -338,7 +338,7 @@ void execute(char** args, int argCount) {
 
     if(pid == 0) {
         if(execv(buffer, args) < 0) {
-          fprintf(stderr, "\nError executing funciton. ERROR#%d\n", errno);
+          fprintf(stderr, "\nError executing funtion. ERROR#%d\n", errno);
         }
     }
     else if((waitpid(pid, &status, 0)) == -1) {

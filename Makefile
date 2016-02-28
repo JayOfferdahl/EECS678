@@ -17,7 +17,7 @@ CFILES = quash.c
 HFILES = quash.h debug.h
 
 # Add libraries that need linked as needed (e.g. -lm -lpthread)
-LIBS =
+LIBS = -lreadline
 
 DOXYGENCONF = quash.doxygen
 

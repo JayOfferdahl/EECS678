@@ -166,6 +166,47 @@ void set(char** args, int argCount) {
 }
 
 /**
+ * Returns a string of the executable file, should that executable be found
+ * within one of the path locations in the PATH system variable.
+ *
+ * @param args - the list of arguments inputed for this command
+ */
+char* get_path_exec(char* cmd) { 
+  char pathstr[strlen(getenv("PATH"))];
+  strcpy(pathstr, getenv("PATH"));
+
+  // Parse out the path variable into strings
+  char** PATH = NULL;
+  char* current;
+  int colons = 0, numPaths = 0;
+
+  current = strtok(pathstr, ":");
+
+  while(current) {
+    PATH = realloc(PATH, sizeof(char*) * ++colons);
+
+    PATH[colons - 1] = current;
+    numPaths++;
+
+    current = strtok(NULL, ":");
+    //break;
+  }
+
+  PATH = realloc(PATH, sizeof(char*) * (colons + 1));
+  PATH[colons] = 0;
+
+  char* buffer = (char *) malloc(sizeof(char) * 1024);
+  int i;
+
+  for(i = 0; i < sizeof(PATH); i++) {
+    sprintf(buffer, "%s/%s", PATH[i], cmd);
+    if(access(buffer, X_OK) == 0)
+      return buffer;
+  }
+  return NULL;
+}
+
+/**
  * Execute the function with its arguments
  *
  * @param args - the list of arguments inputed for this command
@@ -173,9 +214,22 @@ void set(char** args, int argCount) {
 void execute(char** args, int argCount) {
   // If we're not in absolute path format, search the PATH variable
   if(args[0][0] != '.') {
+    // Look for accessible executables in the PATH
+    char* buffer = get_path_exec(args[0]);
+    int i;
+    
+    // If we found a valid path, execute at that path
+    if(buffer) {
+      // Add all given arguments to this program
+      for(i = 1; i < argCount; i++) {
+        strcat(buffer, " ");
+        strcat(buffer, args[i]);
+      }
+      printf("Executing %s\n", buffer);
 
-
-    printf("quash: %s: command not found...\n", args[0]);
+    }
+    else
+      printf("quash: %s: command not found...\n", args[0]);
   }
   else {
     printf("quash: %s: No such file or directory\n", args[0]);

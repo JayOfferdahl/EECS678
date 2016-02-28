@@ -63,6 +63,14 @@ void echo(char** args, int argCount);
 void set(char** args, int argCount);
 
 /**
+ * Returns a string of the executable file, should that executable be found
+ * within one of the path locations in the PATH system variable.
+ *
+ * @param args - the list of arguments inputed for this command
+ */
+char* get_path_exec(char* cmd);
+
+/**
  * Execute the function with its arguments
  *
  * @param args - the list of arguments inputed for this command

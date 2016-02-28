@@ -7,10 +7,7 @@
 #ifndef QUASH_H
 #define QUASH_H
 
-#include <stdlib.h>
-#include <stdio.h>
 #include <stdbool.h>
-#include <readline/readline.h>
 
 /**
  * Query if quash should accept more input or not.
@@ -71,6 +68,15 @@ void set(char** args, int argCount);
 char* get_path_exec(char* cmd);
 
 /**
+ * Determines if this command requires a pipeline
+ *
+ * @param args - the list of arguments inputed for this command
+ * @param argCount - the number of arguments inputed for this command
+ * @return 1 if there's a pipe in this command
+ */
+int piped_command(char** args, int argCount);
+
+/**
  * Execute the input function and pipes its output to the input
  * of another function.
  *
@@ -78,6 +84,15 @@ char* get_path_exec(char* cmd);
  * @param argCount - the number of arguments inputed for this command
  */
 void pipe_exec(char* args, int argCount);
+
+/**
+ * Execute the function with its arguments in the background, while keeping track
+ * of the job id, process id, and command in a job struct
+ *
+ * @param args - the list of arguments inputed for this command
+ * @param argCount - the number of arguments included in args
+ */
+void execute_in_background(char** args, int argCount);
 
 /**
  * Execute the function with its arguments

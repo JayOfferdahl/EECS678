@@ -13,11 +13,27 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <ctype.h>
-#include <sys/types.h>
 #include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <sys/wait.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <ctype.h>
+#include <sys/types.h>
+#include <readline/readline.h>
+
+/**
+ * Struct to hold background processes
+ */
+struct job {
+  int jobid;  // The job ID stored in this job
+  pid_t pid;  // The process ID stored in this job
+  char *cmd;  // The command being run by this job
+};
+
+static int numJobs;
+static struct job jobList[100];
 
 /**************************************************************************
  * Private Variables
@@ -113,6 +129,20 @@ void cd(char* target) {
     // Print out the current working directory
   else
     pwd();
+}
+
+/**
+ * Changes the current working directory to the input directory, or
+ * HOME if no directory is given
+ *
+ * @param target - the input to change directories to
+ */
+void print_jobs() {
+  int i;
+
+  // Print out all jobs in the job list
+  for(i = 0; i < numJobs; i++)
+    printf("[%i] %i %s\n", jobList[i].jobid, jobList[i].pid, jobList[i].cmd);
 }
 
 /**
@@ -312,6 +342,40 @@ void pipe_exec(char* cmd, int argCount) {
 }
 
 /**
+ * Execute the function with its arguments in the background, while keeping track
+ * of the job id, process id, and command in a job struct
+ *
+ * @param args - the list of arguments inputed for this command
+ * @param argCount - the number of arguments included in args
+ */
+void execute_in_background(char** args, int argCount) {
+  pid_t pid;
+  pid = fork();
+
+  // Child process
+  if(pid == 0) {
+    printf("\n[%i] %d\n", numJobs + 1, getpid());
+
+    // Execute the function normally
+    execute(args, argCount);
+
+    printf("\n[%i] %d finished %s\nquash$>", numJobs + 1, getpid(), args[0]);
+  }
+  // Parent process
+  else {
+    struct job newJob = {
+      .pid = pid,
+      .jobid = numJobs + 1,
+      .cmd = args[0]
+    };
+
+    jobList[++numJobs - 1] = newJob;
+
+    while(waitid(pid, NULL, WEXITED|WNOHANG) > 0) {}
+  }
+}
+
+/**
  * Execute the function with its arguments
  *
  * @param args - the list of arguments inputed for this command
@@ -350,6 +414,27 @@ void execute(char** args, int argCount) {
 }
 
 /**
+ * Kills the selected job if it exists in the background
+ *
+ * @param args - the list of arguments inputed for this command
+ * @param argCount - the number of arguments included in args
+ */
+void killProcess(char** args, int argCount) {
+  int i;
+  char buffer[256];
+
+  // Print out all jobs in the job list
+  for(i = 0; i < numJobs; i++) {
+    sprintf(buffer, "%i", jobList[i].jobid);
+    if(!strcmp(args[2], buffer)) {
+      printf("Killed process %i\n", jobList[i].pid);
+      if(kill(jobList[i].pid, strtoumax(args[1], NULL, 10)) == -1)
+        fprintf(stderr, "Killing encountered an error: ERROR%d\n", errno);
+    }
+  }
+}
+
+/**
  * Handles the input command by tokenizing the string and executing functions
  * based on the input
  *
@@ -382,7 +467,18 @@ void handle_cmd(char* cmd) {
   }
   // Set home/path variables
   else if(!strcmp(args[0], "set")) {
-      set(args, argCount);
+    set(args, argCount);
+  }
+  // Print out all current jobs
+  else if(!strcmp(args[0], "jobs")) {
+    print_jobs();
+  }
+  // Kill the input process id
+  else if(!strcmp(args[0], "kill")) {
+    if(argCount != 3)
+      printf("quash: kill: invalid number of arguments: 3 expected, %i received", argCount);
+    else
+      killProcess(args, argCount);
   }
   // Quit/Exit
   else if(!strcmp(args[0], "exit") || !strcmp(args[0], "quit")) {
@@ -395,6 +491,17 @@ void handle_cmd(char* cmd) {
       printf("quash: cannot pipe to null\n");
     else
       pipe_exec(cmd, argCount);
+  }
+  // If the last argument is &, run this in the background
+  else if(!strcmp(args[argCount - 1], "&")) {
+    if(argCount == 1)
+      printf("quash: & must be used after a command\n");
+    else {
+      // Take off the ampersand
+      args[argCount - 1] = 0;
+      argCount--;
+      execute_in_background(args, argCount);
+    }
   }
   // Else, try to execute it
   else {
@@ -440,6 +547,7 @@ int main(int argc, char** argv) {
   start();
 
   char* cmd, line[1024];
+  numJobs = 0;
   
   puts("\nWelcome to Quash!");
   puts("Type \"exit\" or \"quit\" to quit\n");

@@ -10,10 +10,14 @@
 #include "quash.h" // Putting this above the other includes allows us to ensure
                    // this file's headder's #include statements are self
                    // contained.
-
+#include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <sys/types.h>
 #include <unistd.h>
+#include <errno.h>
+#include <sys/wait.h>
 
 /**************************************************************************
  * Private Variables
@@ -189,7 +193,6 @@ char* get_path_exec(char* cmd) {
     numPaths++;
 
     current = strtok(NULL, ":");
-    //break;
   }
 
   PATH = realloc(PATH, sizeof(char*) * (colons + 1));
@@ -207,11 +210,105 @@ char* get_path_exec(char* cmd) {
 }
 
 /**
+ * Determines if this command requires a pipeline
+ *
+ * @param args - the list of arguments inputed for this command
+ * @param argCount - the number of arguments inputed for this command
+ * @return 1 if there's a pipe in this command
+ */
+int piped_command(char** args, int argCount) {
+  int i;
+
+  for(i = 1; i < argCount; i++) {
+    if(!strcmp(args[i], "|") && i != argCount - 1)
+      return 1;
+  }
+
+  return 0;
+}
+
+/**
+ * Execute the input function and pipes its output to the input
+ * of another function.
+ *
+ * @param args - the list of arguments inputed for this command
+ * @param argCount - the number of arguments inputed for this command
+ */
+void pipe_exec(char** args, int argCount) {
+  char *first[3], *second[3], *path1 = NULL, *path2 = NULL;
+  int onFirst = 1, i;
+
+  path1 = get_path_exec(args[0]);
+  printf(path1);
+
+  // Concatenate the arguments
+  for(i = 0; i < argCount; i++) {
+    if(!strcmp(args[i], "|")) {
+      onFirst = 0;
+      first[i] = 0;
+      path2 = get_path_exec(args[i + 1]);
+    }
+    else if(onFirst)
+      first[i] = args[i];
+    else
+      second[i] = args[i];
+  }
+  second[i] = 0;
+
+  pid_t pid_1, pid_2;
+
+  // Setup pipeline
+  int fd[2], status;
+  pipe(fd);
+
+  pid_1 = fork();
+  if(pid_1 == 0) {
+    dup2(fd[1], STDOUT_FILENO);
+    close(fd[0]);
+    close(fd[1]);
+
+    // Execute the program
+    if(execv(path1, first) < 0) {
+      fprintf(stderr, "\nError executing the first command. ERROR#%d\n", errno);
+    }
+
+    exit(0);
+  }
+
+  pid_2 = fork();
+  if(pid_2 == 0) {
+    dup2(fd[0], STDIN_FILENO);
+    close(fd[0]);
+    close(fd[1]);
+
+    fflush(stdout);
+
+    // Execute the program
+    if(execv(path2, second) < 0) {
+      fprintf(stderr, "\nError executing the second command. ERROR#%d\n", errno);
+    }
+
+    exit(0);
+  }
+
+  close(fd[0]);
+  close(fd[1]);
+
+  if((waitpid(pid_1, &status, 0)) == -1) {
+    fprintf(stderr, "Process 1 encountered an error. ERROR%d", errno);
+  }
+  if((waitpid(pid_2, &status, 0)) == -1) {
+    fprintf(stderr, "Process 2 encountered an error. ERROR%d", errno);
+  }
+}
+
+/**
  * Execute the function with its arguments
  *
  * @param args - the list of arguments inputed for this command
  */
 void execute(char** args, int argCount) {
+  int status;
   // If we're not in absolute path format, search the PATH variable
   if(args[0][0] != '.') {
     // Look for accessible executables in the PATH
@@ -220,18 +317,48 @@ void execute(char** args, int argCount) {
     
     // If we found a valid path, execute at that path
     if(buffer) {
-      // Add all given arguments to this program
-      for(i = 1; i < argCount; i++) {
-        strcat(buffer, " ");
-        strcat(buffer, args[i]);
+      char* argsBuffer = (char *) malloc(sizeof(char) * 1024);
+
+      if(argCount > 1) {
+        strcpy(argsBuffer, args[1]);
+        //strcat(argsBuffer, " ");
+        // Add all given arguments to this program
+        for(i = 2; i < argCount; i++) {
+          strcat(argsBuffer, args[i]);
+          strcat(argsBuffer, " ");
+        }
+        trim(argsBuffer);
       }
-      printf("Executing %s\n", buffer);
+      printf("Executing %s %s\n", buffer, argsBuffer);
+
+      pid_t pid;
+      pid = fork();
+
+      if(pid == 0) {
+          if((execl(buffer, buffer, argsBuffer, (char *) 0)) < 0) {
+            fprintf(stderr, "\nError executing funciton. ERROR#%d\n", errno);
+          }
+      }
+      else if((waitpid(pid, &status, 0)) == -1) {
+        fprintf(stderr, "Process 1 encountered an error. ERROR%d", errno);
+      }
 
     }
     else
       printf("quash: %s: command not found...\n", args[0]);
   }
-  else {
+  else {/*
+    pid_t pid;
+    pid = fork();
+
+    if(pid == 0) {
+        if((execl(buffer, buffer, argsBuffer, (char *) 0)) < 0) {
+          fprintf(stderr, "\nError executing funciton. ERROR#%d\n", errno);
+        }
+    }
+    else if((waitpid(pid, &status, 0)) == -1) {
+      fprintf(stderr, "Process 1 encountered an error. ERROR%d", errno);
+    }*/
     printf("quash: %s: No such file or directory\n", args[0]);
   }  
 }
@@ -271,6 +398,10 @@ void handle_cmd(char* cmd) {
     puts("Exiting...");
     terminate(); // Exit quash
   }
+  // Search for pipes
+  else if(piped_command(args, argCount)) {
+    pipe_exec(args, argCount);
+  }
   // Else, try to execute it
   else {
     execute(args, argCount);
@@ -283,23 +414,25 @@ void handle_cmd(char* cmd) {
  * @param input - the string to be trimmed
  */
 void trim(char* cmd) {
-  // Move pointer from front of string to first legit character
-  while(isspace(*cmd))
-    cmd++;
+  if(cmd) {
+    // Move pointer from front of string to first legit character
+    while(isspace(*cmd))
+      cmd++;
 
-  // The string is empty
-  if(*cmd == 0)
-    return;
+    // The string is empty
+    if(*cmd == 0)
+      return;
 
-  // Find the back of the string
-  char* back = cmd + strlen(cmd) - 1;
+    // Find the back of the string
+    char* back = cmd + strlen(cmd) - 1;
 
-  // Move back pointer from back of string to last legit character
-  while(isspace(*back) && back > cmd) 
-    back--;
+    // Move back pointer from back of string to last legit character
+    while(isspace(*back) && back > cmd) 
+      back--;
 
-  // Terminate the string
-  *(back + 1) = 0;
+    // Terminate the string
+    *(back + 1) = 0;
+  }
 }
 
 /**

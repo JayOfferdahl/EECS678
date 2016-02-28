@@ -71,6 +71,15 @@ void set(char** args, int argCount);
 char* get_path_exec(char* cmd);
 
 /**
+ * Execute the input function and pipes its output to the input
+ * of another function.
+ *
+ * @param args - the list of arguments inputed for this command
+ * @param argCount - the number of arguments inputed for this command
+ */
+void pipe_exec(char** args, int argCount);
+
+/**
  * Execute the function with its arguments
  *
  * @param args - the list of arguments inputed for this command

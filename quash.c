@@ -220,8 +220,11 @@ int piped_command(char** args, int argCount) {
   int i;
 
   for(i = 1; i < argCount; i++) {
-    if(!strcmp(args[i], "|") && i != argCount - 1)
+    if(!strcmp(args[i], "|")) {
+      if(i == argCount - 1)
+        return -1;
       return 1;
+    }
   }
 
   return 0;
@@ -234,26 +237,32 @@ int piped_command(char** args, int argCount) {
  * @param args - the list of arguments inputed for this command
  * @param argCount - the number of arguments inputed for this command
  */
-void pipe_exec(char** args, int argCount) {
-  char *first[3], *second[3], *path1 = NULL, *path2 = NULL;
-  int onFirst = 1, i;
+void pipe_exec(char* cmd, int argCount) {
+  char **args1 = NULL;
+  char **args2 = NULL;
+  char  *path1, *path2;
 
-  path1 = get_path_exec(args[0]);
-  printf(path1);
+  // Tokenize the string up until the pipe, and then after it
+  fflush(0);
+  path1 = strtok(cmd, "|");
+  path2 = strtok(NULL, "");
+  
+  // Store the arguments in an array
+  args1 = parse_cmd(path1, &argCount);
+  args2 = parse_cmd(path2, &argCount);
 
-  // Concatenate the arguments
-  for(i = 0; i < argCount; i++) {
-    if(!strcmp(args[i], "|")) {
-      onFirst = 0;
-      first[i] = 0;
-      path2 = get_path_exec(args[i + 1]);
-    }
-    else if(onFirst)
-      first[i] = args[i];
-    else
-      second[i] = args[i];
+  // Store the paths of the executables
+  path1 = get_path_exec(args1[0]);
+  path2 = get_path_exec(args2[0]);
+
+  if(!path1) {
+    printf("quash: %s: command not found...\n", args1[0]);
+    return;
   }
-  second[i] = 0;
+  else if(!path2) {
+    printf("quash: %s: command not found...\n", args2[0]);
+    return;
+  }
 
   pid_t pid_1, pid_2;
 
@@ -268,7 +277,7 @@ void pipe_exec(char** args, int argCount) {
     close(fd[1]);
 
     // Execute the program
-    if(execv(path1, first) < 0) {
+    if(execv(path1, args1) < 0) {
       fprintf(stderr, "\nError executing the first command. ERROR#%d\n", errno);
     }
 
@@ -284,7 +293,7 @@ void pipe_exec(char** args, int argCount) {
     fflush(stdout);
 
     // Execute the program
-    if(execv(path2, second) < 0) {
+    if(execv(path2, args2) < 0) {
       fprintf(stderr, "\nError executing the second command. ERROR#%d\n", errno);
     }
 
@@ -309,58 +318,35 @@ void pipe_exec(char** args, int argCount) {
  */
 void execute(char** args, int argCount) {
   int status;
-  // If we're not in absolute path format, search the PATH variable
-  if(args[0][0] != '.') {
-    // Look for accessible executables in the PATH
-    char* buffer = get_path_exec(args[0]);
-    int i;
-    
-    // If we found a valid path, execute at that path
-    if(buffer) {
-      char* argsBuffer = (char *) malloc(sizeof(char) * 1024);
+  char* buffer = NULL;
 
-      if(argCount > 1) {
-        strcpy(argsBuffer, args[1]);
-        //strcat(argsBuffer, " ");
-        // Add all given arguments to this program
-        for(i = 2; i < argCount; i++) {
-          strcat(argsBuffer, args[i]);
-          strcat(argsBuffer, " ");
-        }
-        trim(argsBuffer);
-      }
-      printf("Executing %s %s\n", buffer, argsBuffer);
-
-      pid_t pid;
-      pid = fork();
-
-      if(pid == 0) {
-          if((execl(buffer, buffer, argsBuffer, (char *) 0)) < 0) {
-            fprintf(stderr, "\nError executing funciton. ERROR#%d\n", errno);
-          }
-      }
-      else if((waitpid(pid, &status, 0)) == -1) {
-        fprintf(stderr, "Process 1 encountered an error. ERROR%d", errno);
-      }
-
-    }
-    else
-      printf("quash: %s: command not found...\n", args[0]);
+  // If in absolute path format, try this directory
+  if(args[0][0] == '.') {
+    // If the file is executable here, put it in the buffer
+    if(access(args[0], X_OK) == 0)
+      buffer = args[0];
   }
-  else {/*
+  // If we're not in absolute path format, search the PATH variable
+  else {
+    // Look for accessible executables in the PATH
+    buffer = get_path_exec(args[0]);
+  }
+    
+  if(buffer) {
     pid_t pid;
     pid = fork();
 
     if(pid == 0) {
-        if((execl(buffer, buffer, argsBuffer, (char *) 0)) < 0) {
+        if(execv(buffer, args) < 0) {
           fprintf(stderr, "\nError executing funciton. ERROR#%d\n", errno);
         }
     }
     else if((waitpid(pid, &status, 0)) == -1) {
       fprintf(stderr, "Process 1 encountered an error. ERROR%d", errno);
-    }*/
-    printf("quash: %s: No such file or directory\n", args[0]);
-  }  
+    }
+  }
+  else
+    printf("quash: %s: command not found...\n", args[0]); 
 }
 
 /**
@@ -370,8 +356,13 @@ void execute(char** args, int argCount) {
  * @param cmdstr the input from the command line
  */
 void handle_cmd(char* cmd) {
+  // Copy the command string so cmd stays intact.
+  char* temp = (char *) malloc(sizeof(char *) * strlen(cmd));
+  strcpy(temp, cmd);
+
+  // Parse the string for the argument list
   int argCount = 0;
-  char** args = parse_cmd(cmd, &argCount);
+  char** args = parse_cmd(temp, &argCount);
 
   if(argCount == 0)
     return;
@@ -399,8 +390,11 @@ void handle_cmd(char* cmd) {
     terminate(); // Exit quash
   }
   // Search for pipes
-  else if(piped_command(args, argCount)) {
-    pipe_exec(args, argCount);
+  else if(piped_command(args, argCount) != 0) {
+    if(piped_command(args, argCount) == -1)
+      printf("quash: cannot pipe to null\n");
+    else
+      pipe_exec(cmd, argCount);
   }
   // Else, try to execute it
   else {

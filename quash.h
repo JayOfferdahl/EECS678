@@ -77,7 +77,7 @@ char* get_path_exec(char* cmd);
  * @param args - the list of arguments inputed for this command
  * @param argCount - the number of arguments inputed for this command
  */
-void pipe_exec(char** args, int argCount);
+void pipe_exec(char* args, int argCount);
 
 /**
  * Execute the function with its arguments

@@ -20,7 +20,7 @@
  * Holds information about a command.
  */
 typedef struct command_t {
-  char cmdstr[MAX_COMMAND_LENGTH]; ///< character buffer to store the
+  char *cmdstr; 				   ///< character buffer to store the
                                    ///< command string. You may want
                                    ///< to modify this to accept
                                    ///< arbitrarily long strings for
@@ -52,5 +52,41 @@ void terminate();
  *  @return True if able to fill #command_t.cmdstr and false otherwise
  */
 bool get_command(command_t* cmd, FILE* in);
+
+/**
+ * Parses the input string and splits it up based on whitespace
+ *
+ * @param cmdstr the input from the command line
+ * @return the number of arguments included in the command
+ */
+int parse_cmd(command_t* cmd, char** args, int numCmds);
+
+/**
+ * Prints the current working directory
+ */
+void pwd();
+
+/**
+ * Changes the current working directory to the input directory, or
+ * HOME if no directory is given
+ *
+ * @param target - the input to change directories to
+ */
+void cd(char* target);
+
+/**
+ * Handles the input command by tokenizing the string and executing functions
+ * based on the input
+ *
+ * @param cmdstr the input from the command line
+ */
+void handle_cmd(command_t cmd);
+
+/**
+ * Trims leading and trailing whitespace from the input string
+ *
+ * @param input - the string to be trimmed
+ */
+void trim(command_t* cmd);
 
 #endif // QUASH_H

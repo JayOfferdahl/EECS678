@@ -12,6 +12,10 @@
                    // contained.
 
 #include <string.h>
+#include <ctype.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdio.h>
 
 /**************************************************************************
  * Private Variables
@@ -65,12 +69,155 @@ bool get_command(command_t* cmd, FILE* in) {
 }
 
 /**
- * Command handler
+ * Parses the input string and splits it up based on whitespace
+ *
+ * @param cmdstr the input from the command line
+ * @return the number of arguments included in the command
+ */
+int parse_cmd(command_t* cmd, char** args, int numCmds) {
+  int length = cmd->cmdlen, i, argStart, argEnd, endOfString, argCount;
+  argStart = argEnd = endOfString = argCount = 0;
+
+  char* string = (char *) malloc(length);
+
+  // Temporarily store the string
+  strcpy(string, cmd->cmdstr);
+
+  // Empty command
+  if(cmd->cmdlen == 0)
+    return argCount;
+
+  // Allow a max of 10 arguments
+  for(i = 0; i < numCmds && !endOfString; i++) {
+    while(!isspace(*string)) {
+      // If at the end of the string, break out
+      if(*string == 0) {
+        endOfString = true;
+        break;
+      }
+      argEnd++;
+      string++;
+    }
+
+    // If there's something to add
+    if(argEnd != argStart) {
+      length = argEnd - argStart;
+
+      // Allocate memory in the input array
+      args[i] = malloc(length + 1);
+
+      strncpy(args[i], cmd->cmdstr + argStart, length);
+      args[i][length] = 0;
+      argCount++;
+    }
+    string++;
+    argEnd++;
+    argStart = argEnd;
+  }
+  if(!endOfString)
+    argCount++;
+  return argCount;
+}
+
+/**
+ * Prints the current working directory
+ */
+void pwd() {
+  char cwd[1024];
+  getcwd(cwd, 1024);
+
+  printf("%s\n", cwd);
+}
+
+/**
+ * Changes the current working directory to the input directory, or
+ * HOME if no directory is given
+ *
+ * @param target - the input to change directories to
+ */
+void cd(char* target) {
+  // Change directory to the HOME variable
+  if(!target) {
+    if(chdir(getenv("HOME")) == -1)
+      printf("quash: cd: %s: No such file or directory\n", getenv("HOME"));
+
+    pwd();
+  }
+  else if(chdir(target) == -1)
+    printf("quash: cd: %s: No such file or directory\n", target);
+    // Print out the current working directory
+  else
+    pwd();
+}
+
+/**
+ * Handles the input command by tokenizing the string and executing functions
+ * based on the input
  *
  * @param cmdstr the input from the command line
  */
 void handle_cmd(command_t cmd) {
-  puts(cmd.cmdstr); // Echo the input string
+  int NUM_CMDS = 20, i;
+  char *args[NUM_CMDS];
+
+  // Initialize all args to null
+  for(i = 0; i < NUM_CMDS; i++)
+    args[i] = NULL;
+
+  int argCount = parse_cmd(&cmd, args, NUM_CMDS);
+
+  if(argCount > NUM_CMDS) {
+    printf("You've entered too many arguments. Please try again.\n");
+    return;
+  }
+  else if(argCount == 0) {
+    return;
+  }
+
+  // Main handler
+
+  // Print working directory (with args)
+  if(!strcmp(args[0], "pwd")) {
+    pwd();
+  }
+  // Change directory (with/without args)
+  else if(!strcmp(args[0], "cd")) {
+    cd(args[1]);
+  }
+  else {
+    printf("quash: %s: command not found...\n", args[0]);
+  }
+}
+
+/**
+ * Trims leading and trailing whitespace from the input string
+ *
+ * @param input - the string to be trimmed
+ */
+void trim(command_t* cmd) {
+  int commandLength = cmd->cmdlen;
+
+  // Move pointer from front of string to first legit character
+  while(isspace(*cmd->cmdstr)) {
+    cmd->cmdstr++;
+    cmd->cmdlen--;
+  }
+
+  // The string is empty
+  if(*cmd->cmdstr == 0)
+    return;
+
+  // Find the back of the string
+  char* back = cmd->cmdstr + commandLength - 1;
+
+  // Move back pointer from back of string to last legit character
+  while(isspace(*back) && back > cmd->cmdstr) {
+    back--;
+    cmd->cmdlen--;
+  }
+
+  // Terminate the string
+  *(back + 1) = 0;
 }
 
 /**
@@ -81,25 +228,29 @@ void handle_cmd(command_t cmd) {
  * @return program exit status
  */
 int main(int argc, char** argv) { 
+  // #TODO --> on first program run, if a string longer than 25 characters is entered, seg fault... why?
   command_t cmd; //< Command holder argument
-  
+
   start();
   
-  puts("Welcome to Quash!");
-  puts("Type \"exit\" or \"quit\" to quit");
-
+  puts("\nWelcome to Quash!");
+  puts("Type \"exit\" or \"quit\" to quit\n");
+  printf("quash$> ");
   // Main execution loop
   while (is_running() && get_command(&cmd, stdin)) {
-    // NOTE: I would not recommend keeping anything inside the body of
-    // this while loop. It is just an example.
+    // Trim down the command (leading & trailng white space)
+    trim(&cmd);
 
-    // The commands should be parsed, then executed.
+    // Terminate this program if the user wants to exit
     if (!strcmp(cmd.cmdstr, "exit") || !strcmp(cmd.cmdstr, "quit")) {
       puts("Exiting...");
       terminate(); // Exit Quash
     }
-    else
+    else {
+      // If we didn't terminate, parse the command
       handle_cmd(cmd);
+      printf("quash$> ");
+    }
   }
 
   return EXIT_SUCCESS;

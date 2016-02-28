@@ -71,7 +71,7 @@ bool get_command(command_t* cmd, FILE* in) {
  * @param cmdstr the input from the command line
  * @return the number of arguments included in the command
  */
-int parse_cmd(command_t* cmd, char** args) {
+int parse_cmd(command_t* cmd, char** args, int numCmds) {
   int length = cmd->cmdlen, i, argStart, argEnd, endOfString, argCount;
   argStart = argEnd = endOfString = argCount = 0;
 
@@ -85,7 +85,7 @@ int parse_cmd(command_t* cmd, char** args) {
     return argCount;
 
   // Allow a max of 10 arguments
-  for(i = 0; i < 10 && !endOfString; i++) {
+  for(i = 0; i < numCmds && !endOfString; i++) {
     while(!isspace(*string)) {
       // If at the end of the string, break out
       if(*string == 0) {
@@ -122,17 +122,21 @@ int parse_cmd(command_t* cmd, char** args) {
  * @param cmdstr the input from the command line
  */
 void handle_cmd(command_t cmd) {
-  char *args[10];
-  int argCount = parse_cmd(&cmd, args);
+  int NUM_CMDS = 20;
+  char *args[NUM_CMDS];
+  int argCount = parse_cmd(&cmd, args, NUM_CMDS);
 
-  if(argCount > 10)
+  if(argCount > NUM_CMDS) {
     printf("You've entered too many arguments. Please try again.\n");
-  else {
-    int i;
+    return;
+  }
+  else if(argCount == 0) {
+    return;
+  }
+  // Main handler
 
-    printf("The following commands were entered:\n");
-    for(i = 0; i < argCount; i++)
-      printf("%s\n", args[i]);
+  if(strcmp(args[0], "")) {
+
   }
 }
 

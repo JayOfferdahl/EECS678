@@ -121,10 +121,7 @@ void cd(char* target) {
 }
 
 /**
- * Changes the current working directory to the input directory, or
- * HOME if no directory is given
- *
- * @param target - the input to change directories to
+ * Prints out all the jobs in the job list
  */
 void print_jobs() {
   int i;
@@ -139,8 +136,8 @@ void print_jobs() {
  * variables, those values are printed out. If the second arguemtn is not
  * one of these variables, all subsequent arguments are printed out
  *
- * @param argCount - the number of arguments inputed for this command
- * @param args - the list of arguments inputed for this command
+ * @param args - the list of arguments inputted for this command
+ * @param argCount - the number of arguments inputted for this command
  */
 void echo(char** args, int argCount) {
   int i;
@@ -163,7 +160,8 @@ void echo(char** args, int argCount) {
 /**
  * Sets the system variables HOME or PATH to the desired location
  *
- * @param args - the list of arguments inputed for this command
+ * @param args - the list of arguments inputted for this command
+ * @param argCount - the number of arguments inputted for this command
  */
 void set(char** args, int argCount) {
   if(argCount < 3)
@@ -192,7 +190,8 @@ void set(char** args, int argCount) {
  * Returns a string of the executable file, should that executable be found
  * within one of the path locations in the PATH system variable.
  *
- * @param args - the list of arguments inputed for this command
+ * @param cmd - the input argument for this command
+ * @return a string of the path to the executable, NULL if not found
  */
 char* get_path_exec(char* cmd) { 
   char pathstr[strlen(getenv("PATH"))];
@@ -231,8 +230,8 @@ char* get_path_exec(char* cmd) {
 /**
  * Determines if this command requires a pipeline
  *
- * @param args - the list of arguments inputed for this command
- * @param argCount - the number of arguments inputed for this command
+ * @param args - the list of arguments inputted for this command
+ * @param argCount - the number of arguments inputted for this command
  * @return 1 if there's a pipe in this command
  */
 int piped_command(char** args, int argCount) {
@@ -253,34 +252,33 @@ int piped_command(char** args, int argCount) {
  * Execute the input function and pipes its output to the input
  * of another function.
  *
- * @param args - the list of arguments inputed for this command
- * @param argCount - the number of arguments inputed for this command
+ * @param args - the list of arguments inputted for this command
+ * @param argCount - the number of arguments inputted for this command
  */
 void pipe_exec(char* cmd, int argCount) {
-  char **args1 = NULL;
-  char **args2 = NULL;
-  char  *path1, *path2;
+  char **args = NULL;
+  char  *path, *rhs;
+  char buffer[256];
 
   // Tokenize the string up until the pipe, and then after it
-  fflush(0);
-  path1 = strtok(cmd, "|");
-  path2 = strtok(NULL, "");
+  path = strtok(cmd, "|");
+  rhs = strtok(NULL, "");
   
   // Store the arguments in an array
-  args1 = parse_cmd(path1, &argCount);
-  args2 = parse_cmd(path2, &argCount);
+  args = parse_cmd(path, &argCount);
 
   // Store the paths of the executables
-  path1 = get_path_exec(args1[0]);
-  path2 = get_path_exec(args2[0]);
+  path = get_path_exec(args[0]);
 
-  if(!path1) {
-    printf("quash: %s: command not found...\n", args1[0]);
-    return;
-  }
-  else if(!path2) {
-    printf("quash: %s: command not found...\n", args2[0]);
-    return;
+  if(!path) {
+    if(access(args[0], X_OK) == 0) {
+      // Path works (absolute path format)
+      path = args[0];
+    }
+    else {
+      printf("quash: %s: command not found...\n", args[0]);
+      return;
+    }
   }
 
   pid_t pid_1, pid_2;
@@ -296,9 +294,8 @@ void pipe_exec(char* cmd, int argCount) {
     close(fd[1]);
 
     // Execute the program
-    if(execv(path1, args1) < 0) {
+    if(execv(path, args) < 0)
       fprintf(stderr, "\nError executing the first command. ERROR#%d\n", errno);
-    }
 
     exit(0);
   }
@@ -312,9 +309,7 @@ void pipe_exec(char* cmd, int argCount) {
     fflush(stdout);
 
     // Execute the program
-    if(execv(path2, args2) < 0) {
-      fprintf(stderr, "\nError executing the second command. ERROR#%d\n", errno);
-    }
+    handle_cmd(rhs);
 
     exit(0);
   }
@@ -334,7 +329,7 @@ void pipe_exec(char* cmd, int argCount) {
  * Execute the function with its arguments in the background, while keeping track
  * of the job id, process id, and command in a job struct
  *
- * @param args - the list of arguments inputed for this command
+ * @param args - the list of arguments inputted for this command
  * @param argCount - the number of arguments included in args
  */
 void execute_in_background(char** args, int argCount) {
@@ -344,12 +339,11 @@ void execute_in_background(char** args, int argCount) {
   // Child process
   if(pid == 0) {
     printf("\n[%i] %d\n", numJobs + 1, getpid());
-
     // Execute the function normally
     execute(args, argCount);
 
     printf("\n[%i] %d finished %s\n", numJobs + 1, getpid(), args[0]);
-
+    kill(getpid(), 9);
     exit(0);
   }
   // Parent process
@@ -361,7 +355,6 @@ void execute_in_background(char** args, int argCount) {
     };
 
     jobList[++numJobs - 1] = newJob;
-
     while(waitid(pid, NULL, WEXITED|WNOHANG) > 0) {}
   }
 }
@@ -369,7 +362,8 @@ void execute_in_background(char** args, int argCount) {
 /**
  * Execute the function with its arguments
  *
- * @param args - the list of arguments inputed for this command
+ * @param args - the list of arguments inputted for this command
+ * @param argCount - the number of arguments inputted for this command
  */
 void execute(char** args, int argCount) {
   int status;
@@ -404,6 +398,13 @@ void execute(char** args, int argCount) {
     printf("quash: %s: command not found...\n", args[0]); 
 }
 
+/**
+ * Implements I/O redirection to write or read command output to/from a file
+ *
+ * @param cmd - the command string inputted for this command
+ * @param args - the list of arguments inputted for this command
+ * @param argCount - the number of arguments inputted for this command
+ */
 void ioRedirect(char* cmd, char ** args, int argCount)
 {
   // Redirect standard input from a file
@@ -535,7 +536,7 @@ void ioRedirect(char* cmd, char ** args, int argCount)
 /**
  * Kills the selected job if it exists in the background
  *
- * @param args - the list of arguments inputed for this command
+ * @param args - the list of arguments inputted for this command
  * @param argCount - the number of arguments included in args
  */
 void killProcess(char** args, int argCount) {
@@ -557,7 +558,7 @@ void killProcess(char** args, int argCount) {
  * Handles the input command by tokenizing the string and executing functions
  * based on the input
  *
- * @param cmdstr the input from the command line
+ * @param cmd the input from the command line
  */
 void handle_cmd(char* cmd) {
   // Copy the command string so cmd stays intact.
@@ -600,7 +601,7 @@ void handle_cmd(char* cmd) {
   // Kill the input process id
   else if(!strcmp(args[0], "kill")) {
     if(argCount != 3)
-      printf("quash: kill: invalid number of arguments: 3 expected, %i received", argCount);
+      printf("quash: kill: invalid number of arguments: 3 expected, %i received\n", argCount);
     else
       killProcess(args, argCount);
   }
@@ -636,7 +637,7 @@ void handle_cmd(char* cmd) {
 /**
  * Trims leading and trailing whitespace from the input string
  *
- * @param input - the string to be trimmed
+ * @param cmd - the string to be trimmed
  */
 void trim(char* cmd) {
   if(cmd) {

@@ -243,27 +243,6 @@ char* get_path_exec(char* cmd) {
 }
 
 /**
- * Determines if this command requires a pipeline
- *
- * @param args - the list of arguments inputted for this command
- * @param argCount - the number of arguments inputted for this command
- * @return 1 if there's a pipe in this command
- */
-int piped_command(char** args, int argCount) {
-  int i;
-
-  for(i = 1; i < argCount; i++) {
-    if(!strcmp(args[i], "|")) {
-      if(i == argCount - 1)
-        return -1;
-      return 1;
-    }
-  }
-
-  return 0;
-}
-
-/**
  * Execute the input function and pipes its output to the input
  * of another function.
  *
@@ -433,14 +412,13 @@ void ioRedirect(char* cmd, char ** args, int argCount)
     char fileName[1024];
     getcwd(fileName, 1024);
     strcat(fileName, "/");
-
-    char *buffer = get_path_exec(args[0]);
     
     // Get number of args on LHS of the carrot
     char *tokenizedCmd;
     tokenizedCmd = strtok(cmd, " ");
 
-    int counter = 0;
+    char temp[1024] = "";
+
     while (tokenizedCmd != NULL)
     {
       if (strcmp(tokenizedCmd, "<") == 0)
@@ -451,18 +429,11 @@ void ioRedirect(char* cmd, char ** args, int argCount)
       }
       else
       {
-        counter++;
+        strcat(temp, tokenizedCmd);
+        strcat(temp, " ");
         tokenizedCmd = strtok(NULL, " ");
       }
     }
-
-    char *argv[1024];
-
-    for (int i = 0; i < counter; i++)
-    {
-      argv[i] = args[i];
-    }
-    argv[counter] = NULL;
 
     pid_t pid;
     pid = fork();
@@ -473,14 +444,11 @@ void ioRedirect(char* cmd, char ** args, int argCount)
       // File is open to write to
       freopen(fileName, "r", stdin);
 
-      if (execv(buffer, argv) < 0)
-      {
-        fprintf(stderr, "\nError executing function. ERROR%d\n", errno);
-        return;
-      }
+      handle_cmd(temp);
 
       // Close stdin
       fclose(stdin);
+      exit(0);
     }
     else if((waitpid(pid, &status, 0)) == -1) {
       fprintf(stderr, "Process 1 encountered an error. ERROR%d", errno);
@@ -495,14 +463,13 @@ void ioRedirect(char* cmd, char ** args, int argCount)
     char fileName[1024];
     getcwd(fileName, 1024);
     strcat(fileName, "/");
-
-    char *buffer = get_path_exec(args[0]);
     
     // Get number of args on LHS of the carrot
     char *tokenizedCmd;
     tokenizedCmd = strtok(cmd, " ");
 
-    int counter = 0;
+    char temp[1024] = "";
+
     while (tokenizedCmd != NULL)
     {
       if (strcmp(tokenizedCmd, ">") == 0)
@@ -513,18 +480,11 @@ void ioRedirect(char* cmd, char ** args, int argCount)
       }
       else
       {
-        counter++;
+        strcat(temp, tokenizedCmd);
+        strcat(temp, " ");
         tokenizedCmd = strtok(NULL, " ");
       }
     }
-
-    char *argv[1024];
-
-    for (int i = 0; i < counter; i++)
-    {
-      argv[i] = args[i];
-    }
-    argv[counter] = NULL;
 
     pid_t pid;
     pid = fork();
@@ -535,14 +495,12 @@ void ioRedirect(char* cmd, char ** args, int argCount)
       // File is open to write to
       freopen(fileName, "w", stdout);
 
-      if (execv(buffer, argv) < 0)
-      {
-        fprintf(stderr, "\nError executing function. ERROR%d\n", errno);
-        return;
-      }
+      handle_cmd(temp);
 
       // Close stdout to file
       fclose(stdout);
+      exit(0);
+
     }
     else if((waitpid(pid, &status, 0)) == -1) {
       fprintf(stderr, "Process 1 encountered an error. ERROR%d", errno);
@@ -634,8 +592,8 @@ void handle_cmd(char* cmd) {
     terminate(); // Exit quash
   }
   // Search for pipes
-  else if(piped_command(args, argCount) != 0) {
-    if(piped_command(args, argCount) == -1)
+  else if(strchr(cmd, '|') != NULL) {
+    if(argCount <= 2)
       printf("quash: cannot pipe to null\n");
     else
       pipe_exec(cmd, argCount);

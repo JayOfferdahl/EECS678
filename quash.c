@@ -15,10 +15,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <sys/wait.h>
-#include <stdlib.h>
-#include <stdio.h>
 #include <readline/readline.h>
 
 static int numJobs;
@@ -121,14 +118,32 @@ void cd(char* target) {
 }
 
 /**
+ * Flushes out all the jobs in the job list if they're terminated
+ */
+void flush_jobs() {
+  int i;
+
+  for(i = 0; i < numJobs; i++) {
+  	// wait for the process with no hang
+  	waitpid(jobList[i].pid, NULL, WNOHANG);
+  }
+}
+
+/**
  * Prints out all the jobs in the job list
  */
 void print_jobs() {
   int i;
 
+  // Flush current jobs
+  flush_jobs();
+
   // Print out all jobs in the job list
-  for(i = 0; i < numJobs; i++)
-    printf("[%i] %i %s\n", jobList[i].jobid, jobList[i].pid, jobList[i].cmd);
+  for(i = 0; i < numJobs; i++) {
+  	// If the process exists
+  	if(kill(jobList[i].pid, 0) == 0)
+    	printf("[%i] %i %s\n", jobList[i].jobid, jobList[i].pid, jobList[i].cmd);
+  }
 }
 
 /**
@@ -258,7 +273,6 @@ int piped_command(char** args, int argCount) {
 void pipe_exec(char* cmd, int argCount) {
   char **args = NULL;
   char  *path, *rhs;
-  char buffer[256];
 
   // Tokenize the string up until the pipe, and then after it
   path = strtok(cmd, "|");
@@ -339,11 +353,12 @@ void execute_in_background(char** args, int argCount) {
   // Child process
   if(pid == 0) {
     printf("\n[%i] %d\n", numJobs + 1, getpid());
+
     // Execute the function normally
     execute(args, argCount);
 
     printf("\n[%i] %d finished %s\n", numJobs + 1, getpid(), args[0]);
-    kill(getpid(), 9);
+
     exit(0);
   }
   // Parent process
@@ -355,7 +370,9 @@ void execute_in_background(char** args, int argCount) {
     };
 
     jobList[++numJobs - 1] = newJob;
-    while(waitid(pid, NULL, WEXITED|WNOHANG) > 0) {}
+    
+    // Try to flush here
+    while(waitpid(pid, NULL, WEXITED | WNOHANG) > 0) {}
   }
 }
 
@@ -547,9 +564,15 @@ void killProcess(char** args, int argCount) {
   for(i = 0; i < numJobs; i++) {
     sprintf(buffer, "%i", jobList[i].jobid);
     if(!strcmp(args[2], buffer)) {
-      printf("Killed process %i\n", jobList[i].pid);
-      if(kill(jobList[i].pid, strtoumax(args[1], NULL, 10)) == -1)
-        fprintf(stderr, "Killing encountered an error: ERROR%d\n", errno);
+      // If the process exists
+      if(kill(jobList[i].pid, 0) == 0) {
+        if(kill(jobList[i].pid, strtoumax(args[1], NULL, 10)) == -1)
+          fprintf(stderr, "Killing encountered an error: ERROR%d\n", errno);
+        else
+      	  printf("Killed process %i (jobid: %i)\n", jobList[i].pid, jobList[i].jobid);
+      }
+      else
+      	printf("The requested job does not exist.\n");
     }
   }
 }
@@ -686,6 +709,9 @@ int main(int argc, char** argv) {
       trim(cmd);
       handle_cmd(cmd);
     }
+
+    // Flush current jobs
+  	flush_jobs();
   }
 
   return EXIT_SUCCESS;

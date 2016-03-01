@@ -325,7 +325,10 @@ void pipe_exec(char* cmd, int argCount) {
  * @param args - the list of arguments inputted for this command
  * @param argCount - the number of arguments included in args
  */
-void execute_in_background(char** args, int argCount) {
+void execute_in_background(char* cmd, char** args, int argCount) {
+  // Chop the "&" off the back of the string
+  cmd[strlen(cmd) - 1] = 0;
+
   pid_t pid;
   pid = fork();
 
@@ -334,7 +337,7 @@ void execute_in_background(char** args, int argCount) {
     printf("\n[%i] %d\n", numJobs + 1, getpid());
 
     // Execute the function normally
-    execute(args, argCount);
+    handle_cmd(cmd);
 
     printf("\n[%i] %d finished %s\n", numJobs + 1, getpid(), args[0]);
 
@@ -554,10 +557,29 @@ void handle_cmd(char* cmd) {
     return;
 
   // Main handler
-
-  if(strchr(cmd, '<') != NULL || strchr(cmd, '>') != NULL)
+  // Quit/Exit
+  if(!strcmp(args[0], "exit") || !strcmp(args[0], "quit")) {
+    puts("Exiting...");
+    terminate(); // Exit quash
+  }
+  // If the last argument is &, run this in the background
+  else if(!strcmp(args[argCount - 1], "&")) {
+    if(argCount == 1)
+      printf("quash: & must be used after a command\n");
+    else
+      execute_in_background(cmd, args, argCount);
+  }
+  // File I/O redirection
+  else if(strchr(cmd, '<') != NULL || strchr(cmd, '>') != NULL)
   {
     ioRedirect(cmd, args, argCount);
+  }
+  // Search for pipes
+  else if(strchr(cmd, '|') != NULL) {
+    if(argCount <= 2)
+      printf("quash: cannot pipe to null\n");
+    else
+      pipe_exec(cmd, argCount);
   }
   // Print working directory (with args)
   else if(!strcmp(args[0], "pwd")) {
@@ -585,29 +607,6 @@ void handle_cmd(char* cmd) {
       printf("quash: kill: invalid number of arguments: 3 expected, %i received\n", argCount);
     else
       killProcess(args, argCount);
-  }
-  // Quit/Exit
-  else if(!strcmp(args[0], "exit") || !strcmp(args[0], "quit")) {
-    puts("Exiting...");
-    terminate(); // Exit quash
-  }
-  // Search for pipes
-  else if(strchr(cmd, '|') != NULL) {
-    if(argCount <= 2)
-      printf("quash: cannot pipe to null\n");
-    else
-      pipe_exec(cmd, argCount);
-  }
-  // If the last argument is &, run this in the background
-  else if(!strcmp(args[argCount - 1], "&")) {
-    if(argCount == 1)
-      printf("quash: & must be used after a command\n");
-    else {
-      // Take off the ampersand
-      args[argCount - 1] = 0;
-      argCount--;
-      execute_in_background(args, argCount);
-    }
   }
   // Else, try to execute it
   else {

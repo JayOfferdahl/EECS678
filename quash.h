@@ -54,6 +54,11 @@ void pwd();
 void cd(char* target);
 
 /**
+ * Flushes out all the jobs in the job list if they're terminated
+ */
+void flush_jobs();
+
+/**
  * Prints out all the jobs in the job list
  */
 void print_jobs();
@@ -86,15 +91,6 @@ void set(char** args, int argCount);
 char* get_path_exec(char* cmd);
 
 /**
- * Determines if this command requires a pipeline
- *
- * @param args - the list of arguments inputted for this command
- * @param argCount - the number of arguments inputted for this command
- * @return 1 if there's a pipe in this command
- */
-int piped_command(char** args, int argCount);
-
-/**
  * Execute the input function and pipes its output to the input
  * of another function.
  *
@@ -110,7 +106,7 @@ void pipe_exec(char* args, int argCount);
  * @param args - the list of arguments inputted for this command
  * @param argCount - the number of arguments included in args
  */
-void execute_in_background(char** args, int argCount);
+void execute_in_background(char* cmd, char** args, int argCount);
 
 /**
  * Execute the function with its arguments

@@ -406,8 +406,70 @@ void execute(char** args, int argCount) {
  */
 void ioRedirect(char* cmd, char ** args, int argCount)
 {
+  if (strchr(cmd, '<') != NULL && strchr(cmd, '>') != NULL)
+  {
+    int status;
+
+    // Get fully qualified path to file to be written to 
+    char inFileName[1024];
+    getcwd(inFileName, 1024);
+    strcat(inFileName, "/");
+
+    char outFileName[1024];
+    getcwd(outFileName, 1024);
+    strcat(outFileName, "/");
+
+    char *tokenizedCmd;
+    tokenizedCmd = strtok(cmd, " ");
+
+    char temp[1024] = "";
+
+    while (tokenizedCmd != NULL)
+    {
+      if (strcmp(tokenizedCmd, "<") == 0)
+      {
+        tokenizedCmd = strtok(NULL, " ");
+        strcat (inFileName, tokenizedCmd);
+        tokenizedCmd = strtok(NULL, " ");
+        tokenizedCmd = strtok(NULL, " ");
+        strcat(outFileName, tokenizedCmd);
+        tokenizedCmd = NULL;
+      }
+      else
+      {
+        strcat(temp, tokenizedCmd);
+        strcat(temp, " ");
+        tokenizedCmd = strtok(NULL, " ");
+      }
+    }
+
+    pid_t pid;
+    pid = fork();
+
+    // child process
+    if (pid == 0)
+    {
+      // File is open to write to
+      freopen(outFileName, "w", stdout);
+
+      freopen(inFileName, "r", stdin);
+
+      handle_cmd(temp);
+
+      fclose(stdin);
+
+      // Close stdout to file
+      fclose(stdout);
+      
+      exit(0);
+    }
+    else if((waitpid(pid, &status, 0)) == -1) {
+      fprintf(stderr, "Process 1 encountered an error. ERROR%d", errno);
+    }
+
+  }
   // Redirect standard input from a file
-  if (strchr(cmd, '<') != NULL)
+  else if (strchr(cmd, '<') != NULL)
   {
     int status;
 

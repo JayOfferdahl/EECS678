@@ -19,7 +19,9 @@
  */
 void priqueue_init(priqueue_t *q, int(*comparer)(const void *, const void *))
 {
-
+  q->size = 0;
+  q->head = NULL;
+  q->comparer = comparer;
 }
 
 
@@ -32,7 +34,60 @@ void priqueue_init(priqueue_t *q, int(*comparer)(const void *, const void *))
  */
 int priqueue_offer(priqueue_t *q, void *ptr)
 {
-	return -1;
+  if(q->size == 0) {
+    node_t* temp = malloc(sizeof(node_t));
+    temp->ptr = ptr;
+    temp->next = NULL;
+
+    q->head = temp;
+    q->size++;
+
+    return q->size;
+  }
+  else {
+    node_t* add = malloc(sizeof(node_t));
+    add->ptr = ptr;
+    add->next = NULL;
+
+    node_t* temp = q->head;
+    unsigned int index = 0, breaker = 0;
+    void *tempPtr;
+    q->size++;
+    printf("Head val: %i\n", *(int *)temp->ptr);
+
+    // Cycle through the queue to find the right spot, starting at the head
+    while(temp != NULL) {
+      // If input ptr has higher priority than element we're at, shift down
+      printf("Index: %i -- Ptr: %i -- New: %i === Val: %i\n", index, *(int *)temp->ptr, *(int *)add->ptr, 
+        q->comparer((ptr),(temp->ptr)));
+      if(q->comparer((ptr),(temp->ptr)) < 0) {
+        while(temp != NULL) {
+          // Swap values in temp and add (temp-temp, so to speak)
+          tempPtr = temp->ptr;
+          temp->ptr = add->ptr;
+          add->ptr = tempPtr;
+
+          // If at the last element, we've already swapped, so put the caboose on
+          if(temp->next == NULL) {
+            temp->next = add;
+            break;
+          }
+
+          temp = temp->next;
+        }
+        break;
+      }
+
+      // If at the end of the list, we've already compared, put the new value on the back
+      if(temp->next == NULL) {
+        temp->next = add;
+        break;
+      }
+      temp = temp->next;
+      index++;
+    }
+    return index;
+  }
 }
 
 
@@ -46,7 +101,7 @@ int priqueue_offer(priqueue_t *q, void *ptr)
  */
 void *priqueue_peek(priqueue_t *q)
 {
-	return NULL;
+  return NULL;
 }
 
 
@@ -60,7 +115,7 @@ void *priqueue_peek(priqueue_t *q)
  */
 void *priqueue_poll(priqueue_t *q)
 {
-	return NULL;
+  return NULL;
 }
 
 
@@ -75,7 +130,7 @@ void *priqueue_poll(priqueue_t *q)
  */
 void *priqueue_at(priqueue_t *q, int index)
 {
-	return NULL;
+  return NULL;
 }
 
 
@@ -90,7 +145,7 @@ void *priqueue_at(priqueue_t *q, int index)
  */
 int priqueue_remove(priqueue_t *q, void *ptr)
 {
-	return 0;
+  return 0;
 }
 
 
@@ -105,7 +160,7 @@ int priqueue_remove(priqueue_t *q, void *ptr)
  */
 void *priqueue_remove_at(priqueue_t *q, int index)
 {
-	return 0;
+  return 0;
 }
 
 
@@ -117,7 +172,7 @@ void *priqueue_remove_at(priqueue_t *q, int index)
  */
 int priqueue_size(priqueue_t *q)
 {
-	return 0;
+  return q->size;
 }
 
 
@@ -129,4 +184,19 @@ int priqueue_size(priqueue_t *q)
 void priqueue_destroy(priqueue_t *q)
 {
 
+}
+
+/**
+  Prints out the priority queue
+  
+  @param q a pointer to an instance of the priqueue_t data structure
+ */
+void priqueue_print(priqueue_t *q)
+{
+  node_t* temp = q->head;
+
+  while(temp != NULL) {
+    printf("%i\n", *(int *)temp->ptr);
+    temp = temp->next;
+  }
 }

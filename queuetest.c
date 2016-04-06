@@ -34,8 +34,12 @@ int main()
 	priqueue_offer(&q, &values[12]);
 	priqueue_offer(&q, &values[13]);
 	priqueue_offer(&q, &values[14]);
-	priqueue_offer(&q, &values[12]);
-	priqueue_offer(&q, &values[12]);
+	priqueue_offer(&q, &values[15]);
+	priqueue_offer(&q, &values[16]);
+	printf("Total elements: %d (expected 5).\n", priqueue_size(&q));
+	priqueue_print(&q);
+
+	priqueue_remove_at(&q, 2);
 	printf("Total elements: %d (expected 5).\n", priqueue_size(&q));
 	priqueue_print(&q);
 	/*

@@ -45,6 +45,7 @@ int main()
 	int vals_removed = priqueue_remove(&q, &values[12]);
 	printf("Elements removed: %d (expected 2).\n", vals_removed);
 	printf("Total elements: %d (expected 2).\n", priqueue_size(&q));
+	priqueue_print(&q);
 
 	priqueue_offer(&q, &values[10]);
 	priqueue_offer(&q, &values[30]);

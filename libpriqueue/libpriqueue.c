@@ -181,7 +181,36 @@ void *priqueue_at(priqueue_t *q, int index)
  */
 int priqueue_remove(priqueue_t *q, void *ptr)
 {
-  return 0;
+  if(q->size == 0)
+    return 0;
+  else {
+    int count = 0;
+
+    node_t *temp = q->head, *prev = q->head;
+
+    // Hold onto the previous ptr, check current, if current matches, connect previous to current->next
+    while(temp != NULL) {
+      if(temp->ptr == ptr) {
+        // Check if we're at the head
+        if(temp == q->head) {
+          q->head = prev->next;
+          prev = q->head;
+        }
+        else
+          prev->next = temp->next;
+
+        free(temp);
+
+        count++;
+      }
+      
+      temp = temp->next;
+    }
+
+    q->size -= count;
+
+    return count;
+  }
 }
 
 

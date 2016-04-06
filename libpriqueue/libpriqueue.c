@@ -217,6 +217,7 @@ void priqueue_destroy(priqueue_t *q)
     free(temp);
 
     temp = next;
+    q->size--;
   }
 }
 

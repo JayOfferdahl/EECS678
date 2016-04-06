@@ -147,6 +147,22 @@ void *priqueue_poll(priqueue_t *q)
  */
 void *priqueue_at(priqueue_t *q, int index)
 {
+  // Test for valid input
+  if(index < 0 || index > (int) q->size - 1)
+    printf("Invalid index: priqueue_at called with index: %i\n", index);
+  else {
+    node_t* temp = q->head;
+    int i = 0;
+
+    while(temp != NULL) {
+      // If we're at the right spot, return the pointer
+      if(i++ == index)
+        return temp->ptr;
+
+      temp = temp->next;
+    }
+  }
+
   return NULL;
 }
 

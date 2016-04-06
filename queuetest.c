@@ -37,17 +37,15 @@ int main()
 	priqueue_offer(&q, &values[12]);
 	priqueue_offer(&q, &values[12]);
 	printf("Total elements: %d (expected 5).\n", priqueue_size(&q));
-	priqueue_print(&q);
 
 	int val = *((int *)priqueue_poll(&q));
 	printf("Top element: %d (expected 12).\n", val);
 	printf("Total elements: %d (expected 4).\n", priqueue_size(&q));
-	priqueue_print(&q);
 	/*
 	int vals_removed = priqueue_remove(&q, &values[12]);
 	printf("Elements removed: %d (expected 2).\n", vals_removed);
 	printf("Total elements: %d (expected 2).\n", priqueue_size(&q));
-
+*/
 	priqueue_offer(&q, &values[10]);
 	priqueue_offer(&q, &values[30]);
 	priqueue_offer(&q, &values[20]);
@@ -62,11 +60,12 @@ int main()
 		printf("%d ", *((int *)priqueue_at(&q, i)) );
 	printf("\n");
 
+
 	printf("Elements in reverse order queue (expected 30 20 10): ");
 	for (i = 0; i < priqueue_size(&q2); i++)
 		printf("%d ", *((int *)priqueue_at(&q2, i)) );
 	printf("\n");
-
+/*
 	priqueue_destroy(&q2);
 	priqueue_destroy(&q);*/
 

@@ -34,32 +34,29 @@ void priqueue_init(priqueue_t *q, int(*comparer)(const void *, const void *))
  */
 int priqueue_offer(priqueue_t *q, void *ptr)
 {
+  // Empty queue, set q->head to a new node
   if(q->size == 0) {
-    node_t* temp = malloc(sizeof(node_t));
+    // Make a new node and fill it with the input pointer
+    node_t *temp = malloc(sizeof(node_t));
     temp->ptr = ptr;
     temp->next = NULL;
 
+    // Set the head to the new node & return
     q->head = temp;
-    q->size++;
-
-    return q->size;
+    return q->size++;
   }
   else {
-    node_t* add = malloc(sizeof(node_t));
+    node_t *add = malloc(sizeof(node_t)), *temp = q->head;
     add->ptr = ptr;
     add->next = NULL;
 
-    node_t* temp = q->head;
-    unsigned int index = 0, breaker = 0;
+    int index = 0;
     void *tempPtr;
     q->size++;
-    printf("Head val: %i\n", *(int *)temp->ptr);
 
     // Cycle through the queue to find the right spot, starting at the head
     while(temp != NULL) {
       // If input ptr has higher priority than element we're at, shift down
-      printf("Index: %i -- Ptr: %i -- New: %i === Val: %i\n", index, *(int *)temp->ptr, *(int *)add->ptr, 
-        q->comparer((ptr),(temp->ptr)));
       if(q->comparer((ptr),(temp->ptr)) < 0) {
         while(temp != NULL) {
           // Swap values in temp and add (temp-temp, so to speak)
@@ -78,18 +75,19 @@ int priqueue_offer(priqueue_t *q, void *ptr)
         break;
       }
 
+      // Comparison failed, move onto the next spot
+      index++;
+
       // If at the end of the list, we've already compared, put the new value on the back
       if(temp->next == NULL) {
         temp->next = add;
         break;
       }
       temp = temp->next;
-      index++;
     }
     return index;
   }
 }
-
 
 /**
   Retrieves, but does not remove, the head of this queue, returning NULL if
@@ -101,7 +99,11 @@ int priqueue_offer(priqueue_t *q, void *ptr)
  */
 void *priqueue_peek(priqueue_t *q)
 {
-  return NULL;
+  // If the head exists, return it
+  if(q->size != 0)
+    return q->head;
+  else
+    return NULL;
 }
 
 
@@ -115,9 +117,25 @@ void *priqueue_peek(priqueue_t *q)
  */
 void *priqueue_poll(priqueue_t *q)
 {
-  return NULL;
-}
+  if(q->size != 0) {
+    node_t *temp = q->head;
 
+    if(q->head->next != NULL)
+      q->head = q->head->next;
+    else {
+      q->head = NULL;
+    }
+
+    q->size--;
+
+    // Grab the value pointer, free this memory, and return
+    void* tempPtr = temp->ptr;
+    free(temp);
+    return tempPtr;
+  }
+  else
+    return NULL;
+}
 
 /**
   Returns the element at the specified position in this list, or NULL if
@@ -130,9 +148,24 @@ void *priqueue_poll(priqueue_t *q)
  */
 void *priqueue_at(priqueue_t *q, int index)
 {
+  // Test for valid input
+  if(index < 0 || index > (int) q->size - 1)
+    printf("Invalid index: priqueue_at called with index: %i\n", index);
+  else {
+    node_t* temp = q->head;
+    int i = 0;
+
+    while(temp != NULL) {
+      // If we're at the right spot, return the pointer
+      if(i++ == index)
+        return temp->ptr;
+
+      temp = temp->next;
+    }
+  }
+
   return NULL;
 }
-
 
 /**
   Removes all instances of ptr from the queue. 
@@ -145,9 +178,37 @@ void *priqueue_at(priqueue_t *q, int index)
  */
 int priqueue_remove(priqueue_t *q, void *ptr)
 {
-  return 0;
-}
+  if(q->size == 0)
+    return 0;
+  else {
+    int count = 0;
 
+    node_t *temp = q->head, *prev = q->head;
+
+    // Hold onto the previous ptr, check current, if current matches, connect previous to current->next
+    while(temp != NULL) {
+      if(temp->ptr == ptr) {
+        // Check if we're at the head
+        if(temp == q->head) {
+          q->head = prev->next;
+          prev = q->head;
+        }
+        else
+          prev->next = temp->next;
+
+        free(temp);
+
+        count++;
+      }
+      
+      temp = temp->next;
+    }
+
+    q->size -= count;
+
+    return count;
+  }
+}
 
 /**
   Removes the specified index from the queue, moving later elements up
@@ -160,9 +221,84 @@ int priqueue_remove(priqueue_t *q, void *ptr)
  */
 void *priqueue_remove_at(priqueue_t *q, int index)
 {
+  node_t *elementToRemove;
+  node_t *trailerPointer;
+  node_t *leaderPointer;
+
+  elementToRemove = q->head;
+
+  // Checks to see if queue is empty or if index doesn't exist
+  if (elementToRemove == NULL || (int)q->size - 1 < index)
+  {
+    return NULL;
+  }
+  else
+  {
+    if (index == 0)
+    {
+      // Fix the front of the queue
+      q->head = q->head->next;
+      q->size--;
+      void *tempPtr = elementToRemove->ptr;
+      free(elementToRemove);
+      return tempPtr;
+    }
+
+    trailerPointer = elementToRemove;
+    elementToRemove = elementToRemove->next;
+
+    if (elementToRemove->next != NULL)
+    {
+      leaderPointer = elementToRemove->next;
+    }
+
+    int i;
+    for (i = 1; i < index; i++)
+    {
+      if (leaderPointer->next != NULL)
+      {
+        leaderPointer = leaderPointer->next;
+      }
+      else
+      {
+        leaderPointer = NULL;
+      }
+      elementToRemove = elementToRemove->next;
+      trailerPointer = trailerPointer->next;
+    }
+
+    trailerPointer->next = leaderPointer;
+    q->size--;
+    
+    void *tempPtr = elementToRemove->ptr;
+    free(elementToRemove);
+    return tempPtr;
+  }
+
   return 0;
 }
 
+
+/**
+  Destroys and frees all the memory associated with q.
+  
+  @param q a pointer to an instance of the priqueue_t data structure
+ */
+void priqueue_destroy(priqueue_t *q)
+{
+  node_t *temp = q->head, *next;
+  q->head = NULL;
+
+  // While not at the end of the list, grab the next element and free the current one
+  while(temp != NULL) {
+    next = temp->next;
+
+    free(temp);
+
+    temp = next;
+    q->size--;
+  }
+}
 
 /**
   Returns the number of elements in the queue.
@@ -175,16 +311,6 @@ int priqueue_size(priqueue_t *q)
   return q->size;
 }
 
-
-/**
-  Destroys and frees all the memory associated with q.
-  
-  @param q a pointer to an instance of the priqueue_t data structure
- */
-void priqueue_destroy(priqueue_t *q)
-{
-
-}
 
 /**
   Prints out the priority queue

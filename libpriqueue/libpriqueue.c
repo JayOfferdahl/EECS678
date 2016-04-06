@@ -100,7 +100,11 @@ int priqueue_offer(priqueue_t *q, void *ptr)
  */
 void *priqueue_peek(priqueue_t *q)
 {
-  return NULL;
+  // If the head exists, return it
+  if(q->size != 0)
+    return q->head;
+  else
+    return NULL;
 }
 
 
@@ -111,10 +115,24 @@ void *priqueue_peek(priqueue_t *q)
   @param q a pointer to an instance of the priqueue_t data structure
   @return the head of this queue
   @return NULL if this queue is empty
+  @post caller is responsible for freeing memory of object returned
  */
 void *priqueue_poll(priqueue_t *q)
 {
-  return NULL;
+  if(q->size != 0) {
+    node_t *temp = q->head;
+
+    if(q->head->next != NULL)
+      q->head = q->head->next;
+    else {
+      q->head = NULL;
+    }
+
+    q->size--;
+    return temp->ptr;
+  }
+  else
+    return NULL;
 }
 
 

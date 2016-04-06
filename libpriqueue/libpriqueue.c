@@ -107,7 +107,7 @@ void *priqueue_peek(priqueue_t *q)
     return NULL;
 }
 
-
+// #TODO -- call remove() in this function? need to free memory before leaving?
 /**
   Retrieves and removes the head of this queue, or NULL if this queue
   is empty.
@@ -204,7 +204,17 @@ void *priqueue_remove_at(priqueue_t *q, int index)
  */
 void priqueue_destroy(priqueue_t *q)
 {
+  node_t *temp = q->head, *next;
+  q->head = NULL;
 
+  // While not at the end of the list, grab the next element and free the current one
+  while(temp != NULL) {
+    next = temp->next;
+
+    free(temp);
+
+    temp = next;
+  }
 }
 
 

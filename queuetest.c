@@ -65,9 +65,9 @@ int main()
 	for (i = 0; i < priqueue_size(&q2); i++)
 		printf("%d ", *((int *)priqueue_at(&q2, i)) );
 	printf("\n");
-/*
+
 	priqueue_destroy(&q2);
-	priqueue_destroy(&q);*/
+	priqueue_destroy(&q);
 
 	free(values);
 

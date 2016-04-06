@@ -99,7 +99,11 @@ int priqueue_offer(priqueue_t *q, void *ptr)
  */
 void *priqueue_peek(priqueue_t *q)
 {
-  return NULL;
+  // If the head exists, return it
+  if(q->size != 0)
+    return q->head;
+  else
+    return NULL;
 }
 
 
@@ -113,7 +117,24 @@ void *priqueue_peek(priqueue_t *q)
  */
 void *priqueue_poll(priqueue_t *q)
 {
-  return NULL;
+  if(q->size != 0) {
+    node_t *temp = q->head;
+
+    if(q->head->next != NULL)
+      q->head = q->head->next;
+    else {
+      q->head = NULL;
+    }
+
+    q->size--;
+
+    // Grab the value pointer, free this memory, and return
+    void* tempPtr = temp->ptr;
+    free(temp);
+    return tempPtr;
+  }
+  else
+    return NULL;
 }
 
 /**
@@ -127,6 +148,22 @@ void *priqueue_poll(priqueue_t *q)
  */
 void *priqueue_at(priqueue_t *q, int index)
 {
+  // Test for valid input
+  if(index < 0 || index > (int) q->size - 1)
+    printf("Invalid index: priqueue_at called with index: %i\n", index);
+  else {
+    node_t* temp = q->head;
+    int i = 0;
+
+    while(temp != NULL) {
+      // If we're at the right spot, return the pointer
+      if(i++ == index)
+        return temp->ptr;
+
+      temp = temp->next;
+    }
+  }
+
   return NULL;
 }
 
@@ -215,7 +252,18 @@ void *priqueue_remove_at(priqueue_t *q, int index)
  */
 void priqueue_destroy(priqueue_t *q)
 {
+  node_t *temp = q->head, *next;
+  q->head = NULL;
 
+  // While not at the end of the list, grab the next element and free the current one
+  while(temp != NULL) {
+    next = temp->next;
+
+    free(temp);
+
+    temp = next;
+    q->size--;
+  }
 }
 
 /**

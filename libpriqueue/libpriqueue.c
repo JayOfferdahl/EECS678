@@ -107,7 +107,7 @@ void *priqueue_peek(priqueue_t *q)
     return NULL;
 }
 
-// #TODO -- call remove() in this function? need to free memory before leaving?
+
 /**
   Retrieves and removes the head of this queue, or NULL if this queue
   is empty.
@@ -115,7 +115,6 @@ void *priqueue_peek(priqueue_t *q)
   @param q a pointer to an instance of the priqueue_t data structure
   @return the head of this queue
   @return NULL if this queue is empty
-  @post caller is responsible for freeing memory of object returned
  */
 void *priqueue_poll(priqueue_t *q)
 {
@@ -129,7 +128,11 @@ void *priqueue_poll(priqueue_t *q)
     }
 
     q->size--;
-    return temp->ptr;
+
+    // Grab the value pointer, free this memory, and return
+    void* tempPtr = temp->ptr;
+    free(temp);
+    return tempPtr;
   }
   else
     return NULL;

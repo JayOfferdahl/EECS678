@@ -34,32 +34,29 @@ void priqueue_init(priqueue_t *q, int(*comparer)(const void *, const void *))
  */
 int priqueue_offer(priqueue_t *q, void *ptr)
 {
+  // Empty queue, set q->head to a new node
   if(q->size == 0) {
-    node_t* temp = malloc(sizeof(node_t));
+    // Make a new node and fill it with the input pointer
+    node_t *temp = malloc(sizeof(node_t));
     temp->ptr = ptr;
     temp->next = NULL;
 
+    // Set the head to the new node & return
     q->head = temp;
-    q->size++;
-
-    return q->size;
+    return q->size++;
   }
   else {
-    node_t* add = malloc(sizeof(node_t));
+    node_t *add = malloc(sizeof(node_t)), *temp = q->head;
     add->ptr = ptr;
     add->next = NULL;
 
-    node_t* temp = q->head;
-    unsigned int index = 0, breaker = 0;
+    int index = 0;
     void *tempPtr;
     q->size++;
-    printf("Head val: %i\n", *(int *)temp->ptr);
 
     // Cycle through the queue to find the right spot, starting at the head
     while(temp != NULL) {
       // If input ptr has higher priority than element we're at, shift down
-      printf("Index: %i -- Ptr: %i -- New: %i === Val: %i\n", index, *(int *)temp->ptr, *(int *)add->ptr, 
-        q->comparer((ptr),(temp->ptr)));
       if(q->comparer((ptr),(temp->ptr)) < 0) {
         while(temp != NULL) {
           // Swap values in temp and add (temp-temp, so to speak)
@@ -78,89 +75,18 @@ int priqueue_offer(priqueue_t *q, void *ptr)
         break;
       }
 
+      // Comparison failed, move onto the next spot
+      index++;
+
       // If at the end of the list, we've already compared, put the new value on the back
       if(temp->next == NULL) {
         temp->next = add;
         break;
       }
       temp = temp->next;
-      index++;
     }
     return index;
   }
-}
-
-
-/**
-  Retrieves, but does not remove, the head of this queue, returning NULL if
-  this queue is empty.
- 
-  @param q a pointer to an instance of the priqueue_t data structure
-  @return pointer to element at the head of the queue
-  @return NULL if the queue is empty
- */
-void *priqueue_peek(priqueue_t *q)
-{
-  return NULL;
-}
-
-
-/**
-  Retrieves and removes the head of this queue, or NULL if this queue
-  is empty.
- 
-  @param q a pointer to an instance of the priqueue_t data structure
-  @return the head of this queue
-  @return NULL if this queue is empty
- */
-void *priqueue_poll(priqueue_t *q)
-{
-  return NULL;
-}
-
-
-/**
-  Returns the element at the specified position in this list, or NULL if
-  the queue does not contain an index'th element.
- 
-  @param q a pointer to an instance of the priqueue_t data structure
-  @param index position of retrieved element
-  @return the index'th element in the queue
-  @return NULL if the queue does not contain the index'th element
- */
-void *priqueue_at(priqueue_t *q, int index)
-{
-  return NULL;
-}
-
-
-/**
-  Removes all instances of ptr from the queue. 
-  
-  This function should not use the comparer function, but check if the data contained in each element of the queue is equal (==) to ptr.
- 
-  @param q a pointer to an instance of the priqueue_t data structure
-  @param ptr address of element to be removed
-  @return the number of entries removed
- */
-int priqueue_remove(priqueue_t *q, void *ptr)
-{
-  return 0;
-}
-
-
-/**
-  Removes the specified index from the queue, moving later elements up
-  a spot in the queue to fill the gap.
- 
-  @param q a pointer to an instance of the priqueue_t data structure
-  @param index position of element to be removed
-  @return the element removed from the queue
-  @return NULL if the specified index does not exist
- */
-void *priqueue_remove_at(priqueue_t *q, int index)
-{
-  return 0;
 }
 
 
@@ -175,16 +101,6 @@ int priqueue_size(priqueue_t *q)
   return q->size;
 }
 
-
-/**
-  Destroys and frees all the memory associated with q.
-  
-  @param q a pointer to an instance of the priqueue_t data structure
- */
-void priqueue_destroy(priqueue_t *q)
-{
-
-}
 
 /**
   Prints out the priority queue

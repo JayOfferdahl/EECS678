@@ -210,7 +210,9 @@ void *priqueue_remove_at(priqueue_t *q, int index)
       // Fix the front of the queue
       q->head = q->head->next;
       q->size--;
-      return elementToRemove->ptr;
+      void *tempPtr = elementToRemove->ptr;
+      free(elementToRemove);
+      return tempPtr;
     }
 
     trailerPointer = elementToRemove;
@@ -238,7 +240,10 @@ void *priqueue_remove_at(priqueue_t *q, int index)
 
     trailerPointer->next = leaderPointer;
     q->size--;
-    return elementToRemove->ptr;
+    
+    void *tempPtr = elementToRemove->ptr;
+    free(elementToRemove);
+    return tempPtr;
   }
 
   return 0;

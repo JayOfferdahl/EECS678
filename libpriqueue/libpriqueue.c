@@ -89,7 +89,6 @@ int priqueue_offer(priqueue_t *q, void *ptr)
   }
 }
 
-
 /**
   Retrieves, but does not remove, the head of this queue, returning NULL if
   this queue is empty.
@@ -138,7 +137,6 @@ void *priqueue_poll(priqueue_t *q)
     return NULL;
 }
 
-
 /**
   Returns the element at the specified position in this list, or NULL if
   the queue does not contain an index'th element.
@@ -168,7 +166,6 @@ void *priqueue_at(priqueue_t *q, int index)
 
   return NULL;
 }
-
 
 /**
   Removes all instances of ptr from the queue. 
@@ -213,7 +210,6 @@ int priqueue_remove(priqueue_t *q, void *ptr)
   }
 }
 
-
 /**
   Removes the specified index from the queue, moving later elements up
   a spot in the queue to fill the gap.
@@ -225,6 +221,60 @@ int priqueue_remove(priqueue_t *q, void *ptr)
  */
 void *priqueue_remove_at(priqueue_t *q, int index)
 {
+  node_t *elementToRemove;
+  node_t *trailerPointer;
+  node_t *leaderPointer;
+
+  elementToRemove = q->head;
+
+  // Checks to see if queue is empty or if index doesn't exist
+  if (elementToRemove == NULL || (int)q->size - 1 < index)
+  {
+    return NULL;
+  }
+  else
+  {
+    if (index == 0)
+    {
+      // Fix the front of the queue
+      q->head = q->head->next;
+      q->size--;
+      void *tempPtr = elementToRemove->ptr;
+      free(elementToRemove);
+      return tempPtr;
+    }
+
+    trailerPointer = elementToRemove;
+    elementToRemove = elementToRemove->next;
+
+    if (elementToRemove->next != NULL)
+    {
+      leaderPointer = elementToRemove->next;
+    }
+
+    int i;
+    for (i = 1; i < index; i++)
+    {
+      if (leaderPointer->next != NULL)
+      {
+        leaderPointer = leaderPointer->next;
+      }
+      else
+      {
+        leaderPointer = NULL;
+      }
+      elementToRemove = elementToRemove->next;
+      trailerPointer = trailerPointer->next;
+    }
+
+    trailerPointer->next = leaderPointer;
+    q->size--;
+    
+    void *tempPtr = elementToRemove->ptr;
+    free(elementToRemove);
+    return tempPtr;
+  }
+
   return 0;
 }
 
@@ -249,7 +299,6 @@ void priqueue_destroy(priqueue_t *q)
     q->size--;
   }
 }
-
 
 /**
   Returns the number of elements in the queue.

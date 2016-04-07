@@ -321,8 +321,14 @@ void priqueue_print(priqueue_t *q)
 {
   node_t* temp = q->head;
 
+  printf("[");
+
   while(temp != NULL) {
-    printf("%i\n", *(int *)temp->ptr);
+    if(temp->next != NULL) {
+      printf("%i, ", *(int *)temp->ptr);
+    }
+    else
+      printf("%i]", *(int *)temp->ptr);
     temp = temp->next;
   }
 }

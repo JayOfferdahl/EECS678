@@ -26,14 +26,9 @@ typedef struct _job_t
  */
 priqueue_t q;
 
-int compare1(const void * a, const void * b)
+int FCFScompare(const void * a, const void * b)
 {
   return 1;
-}
-
-int compare2(const void * a, const void * b)
-{
-  return ( *(int*)b - *(int*)a );
 }
 
 /**
@@ -61,7 +56,11 @@ void scheduler_start_up(int cores, scheme_t scheme)
   }
 
   m_type = scheme;
-  priqueue_init(&q, compare1);
+  if (m_type == FCFS)
+  {
+    priqueue_init(&q, FCFScompare);
+  }
+  
 }
 
 

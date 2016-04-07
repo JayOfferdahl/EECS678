@@ -36,6 +36,11 @@ int PRIcompare(const void * a, const void * b)
   return (*(job_t *)a).priority - (*(job_t *)b).priority;
 }
 
+int SJFcompare(const void *a, const void *b){
+{
+  return ((*(job_t*)a).arrivalTime - (*(job_t*)b).arrivalTime);
+}
+
 /**
   Initalizes the scheduler.
  
@@ -64,6 +69,10 @@ void scheduler_start_up(int cores, scheme_t scheme)
   if (m_type == FCFS)
   {
     priqueue_init(&q, FCFScompare);
+  }
+  else if (m_type == SJF)
+  {
+    priqueue_init(&q, SJFcompare);
   }
   else if (m_type == PRI)
   {
@@ -102,6 +111,16 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
   job_t *temp = malloc(sizeof(job_t));
 
   if (m_type == FCFS)
+  {
+    int firstIdleCoreFound = scheduler_idle_core_finder();
+    if (firstIdleCoreFound != -1)
+    {
+      // Signal that the core at firstIdleCoreFound is being used
+      m_coreArr[firstIdleCoreFound] = 1;
+      return firstIdleCoreFound;
+    }
+  }
+  else if (m_type = SJF)
   {
     int firstIdleCoreFound = scheduler_idle_core_finder();
     if (firstIdleCoreFound != -1)
@@ -161,6 +180,11 @@ int scheduler_idle_core_finder(void)
 int scheduler_job_finished(int core_id, int job_number, int time)
 {
   if (m_type == FCFS)
+  {
+    // Free up the core where the finished job has completed
+    m_coreArr[core_id] = 0;
+  }
+  else if (m_type == SJF)
   {
     // Free up the core where the finished job has completed
     m_coreArr[core_id] = 0;

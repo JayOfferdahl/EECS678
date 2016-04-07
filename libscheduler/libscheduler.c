@@ -58,7 +58,7 @@ void scheduler_start_up(int cores, scheme_t scheme)
   {
     priqueue_init(&q, FCFScompare);
   }
-  else if (m_type == SJF)
+  else if (m_type == SJF || m_type == PSJF)
   {
     priqueue_init(&q, SJFcompare);
   }
@@ -122,6 +122,41 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
       return firstIdleCoreFound;
     }
   }
+  else if (m_type == PSJF)
+  {
+    if (firstIdleCoreFound != -1)
+    {
+      m_coreArr[firstIdleCoreFound] = temp;
+      return firstIdleCoreFound;
+    }
+    // Preemptive portion of SFJ
+    else
+    {
+      // Search through all of the cores, and retrieve the longest run time of a given job
+      // if the longest run time is longer than the run time of the job trying to be added, replace the job and put it back on the queue
+      int i;
+      int longestRunTimeFound = -1;
+      int indexOfJobWithLongestRuntime;
+
+      for (i = 0; i < m_cores; i++)
+      {
+        if (m_coreArr[i]->arrivalTime > longestRunTimeFound)
+        {
+          longestRunTimeFound = m_coreArr[i]->arrivalTime;
+          indexOfJobWithLongestRuntime = i;
+        }
+      }
+
+      // If the job found with the longest runtime is longer than job trying to be added, replace the job on the core
+      if (longestRunTimeFound > running_time)
+      {
+        job_t *temp2 = m_coreArr[indexOfJobWithLongestRuntime];
+        m_coreArr[indexOfJobWithLongestRuntime] = temp;
+        priqueue_offer(&q, temp2);
+        return indexOfJobWithLongestRuntime;
+      }
+    }
+  }
   else if (m_type == PRI)
   {
     if (firstIdleCoreFound != -1)
@@ -167,9 +202,10 @@ int scheduler_idle_core_finder(void)
  */
 int scheduler_job_finished(int core_id, int job_number, int time)
 {
-  if (m_type == FCFS || m_type == SJF || m_type == PRI)
+  if (m_type == FCFS || m_type == SJF || m_type == PSJF || m_type == PRI)
   {
     // Free up the core where the finished job has completed
+    free(m_coreArr[core_id]);
     m_coreArr[core_id] = NULL;
   }
 

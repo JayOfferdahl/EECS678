@@ -8,19 +8,6 @@
 #include "libscheduler.h"
 #include "../libpriqueue/libpriqueue.h"
 
-
-/**
-  Stores information making up a job to be scheduled including any statistics.
-
-  You may need to define some global variables or a struct to store your job queue elements. 
-*/
-typedef struct _job_t
-{
-  int pid;
-  int arrivalTime;
-  int priority;
-} job_t;
-
 /**
  * Global priqueue
  */
@@ -36,7 +23,7 @@ int PRIcompare(const void * a, const void * b)
   return (*(job_t *)a).priority - (*(job_t *)b).priority;
 }
 
-int SJFcompare(const void *a, const void *b){
+int SJFcompare(const void *a, const void *b)
 {
   return ((*(job_t*)a).arrivalTime - (*(job_t*)b).arrivalTime);
 }
@@ -56,16 +43,17 @@ int SJFcompare(const void *a, const void *b){
 void scheduler_start_up(int cores, scheme_t scheme)
 {
   m_cores = cores;
-  m_coreArr = malloc(cores * sizeof(int));
+  m_coreArr = malloc(cores * sizeof(job_t));
 
   // Initializes core array so that all cores are in unused state at startup
   int i;
   for (i = 0; i < cores; i++)
   {
-    m_coreArr[i] = 0;
+    m_coreArr[i] = NULL;
   }
 
   m_type = scheme;
+
   if (m_type == FCFS)
   {
     priqueue_init(&q, FCFScompare);
@@ -80,7 +68,7 @@ void scheduler_start_up(int cores, scheme_t scheme)
   }
   else if (m_type == PPRI)
   {
-    priqueue_init(&q, PPRIcompare);
+    priqueue_init(&q, PRIcompare);
   }
   
 }
@@ -108,44 +96,44 @@ void scheduler_start_up(int cores, scheme_t scheme)
  */
 int scheduler_new_job(int job_number, int time, int running_time, int priority)
 {
+  int firstIdleCoreFound = scheduler_idle_core_finder();
+
   job_t *temp = malloc(sizeof(job_t));
+
+  temp->pid = job_number;
+  temp->arrivalTime = running_time;
+  temp->priority = priority;
 
   if (m_type == FCFS)
   {
-    int firstIdleCoreFound = scheduler_idle_core_finder();
     if (firstIdleCoreFound != -1)
     {
       // Signal that the core at firstIdleCoreFound is being used
-      m_coreArr[firstIdleCoreFound] = 1;
+      m_coreArr[firstIdleCoreFound] = temp;
       return firstIdleCoreFound;
     }
   }
-  else if (m_type = SJF)
+  else if (m_type == SJF)
   {
-    int firstIdleCoreFound = scheduler_idle_core_finder();
     if (firstIdleCoreFound != -1)
     {
       // Signal that the core at firstIdleCoreFound is being used
-      m_coreArr[firstIdleCoreFound] = 1;
+      m_coreArr[firstIdleCoreFound] = temp;
       return firstIdleCoreFound;
     }
   }
   else if (m_type == PRI)
   {
-    int firstIdleCoreFound = scheduler_idle_core_finder();
     if (firstIdleCoreFound != -1)
     {
       // Signal that the core at firstIdleCoreFound is being used
-      m_coreArr[firstIdleCoreFound] = 1;
+      m_coreArr[firstIdleCoreFound] = temp;
       return firstIdleCoreFound;
     }
   }
 
-  temp->pid = job_number;
-  temp->arrivalTime = running_time;
-  temp->priority = priority;
+  // If at this step, no scheduling changes should be made
   priqueue_offer(&q, temp);
-
 	return -1;
 }
 
@@ -154,7 +142,7 @@ int scheduler_idle_core_finder(void)
   int i;
   for (i = 0; i < m_cores; i++)
   {
-    if (m_coreArr[i] == 0)
+    if (m_coreArr[i] == NULL)
     {
       return i;
     }
@@ -179,26 +167,18 @@ int scheduler_idle_core_finder(void)
  */
 int scheduler_job_finished(int core_id, int job_number, int time)
 {
-  if (m_type == FCFS)
+  if (m_type == FCFS || m_type == SJF || m_type == PRI)
   {
     // Free up the core where the finished job has completed
-    m_coreArr[core_id] = 0;
-  }
-  else if (m_type == SJF)
-  {
-    // Free up the core where the finished job has completed
-    m_coreArr[core_id] = 0;
-  }
-  else if (m_type == PRI)
-  {
-    // Free up the core where the finished job has completed
-    m_coreArr[core_id] = 0;
+    m_coreArr[core_id] = NULL;
   }
 
   if (priqueue_size(&q) != 0)
   {
-    m_coreArr[core_id] = 1;
-    return *((int*)priqueue_poll(&q));
+    job_t* temp = (job_t*)priqueue_poll(&q);
+    m_coreArr[core_id] = temp;
+
+    return temp->pid;
   }
 	return -1;
 }

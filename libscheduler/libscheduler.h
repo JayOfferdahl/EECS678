@@ -9,8 +9,20 @@
 */
 typedef enum {FCFS = 0, SJF, PSJF, PRI, PPRI, RR} scheme_t;
 
+/**
+  Stores information making up a job to be scheduled including any statistics.
+
+  You may need to define some global variables or a struct to store your job queue elements. 
+*/
+typedef struct _job_t
+{
+  int pid;
+  int arrivalTime;
+  int priority;
+} job_t;
+
 int m_cores;
-int *m_coreArr;
+job_t **m_coreArr;
 scheme_t m_type;
 
 void  scheduler_start_up               (int cores, scheme_t scheme);

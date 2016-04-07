@@ -16,9 +16,15 @@
 */
 typedef struct _job_t
 {
-
+  int pid;
+  int arrivalTime;
+  int priority;
 } job_t;
 
+/**
+ * Global priqueue
+ */
+priqueue_t q;
 
 /**
   Initalizes the scheduler.
@@ -34,7 +40,17 @@ typedef struct _job_t
 */
 void scheduler_start_up(int cores, scheme_t scheme)
 {
+  m_cores = cores;
+  m_coreArr = malloc(cores * sizeof(int));
 
+  // Initializes core array so that all cores are in unused state at startup
+  int i;
+  for (i = 0; i < cores; i++)
+  {
+    m_coreArr[i] = 0;
+  }
+
+  m_type = scheme;
 }
 
 

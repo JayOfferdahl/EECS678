@@ -26,6 +26,16 @@ typedef struct _job_t
  */
 priqueue_t q;
 
+int compare1(const void * a, const void * b)
+{
+  return 1;
+}
+
+int compare2(const void * a, const void * b)
+{
+  return ( *(int*)b - *(int*)a );
+}
+
 /**
   Initalizes the scheduler.
  
@@ -51,6 +61,7 @@ void scheduler_start_up(int cores, scheme_t scheme)
   }
 
   m_type = scheme;
+  priqueue_init(&q, compare1);
 }
 
 
@@ -76,9 +87,40 @@ void scheduler_start_up(int cores, scheme_t scheme)
  */
 int scheduler_new_job(int job_number, int time, int running_time, int priority)
 {
+  job_t *temp = malloc(sizeof(job_t));
+
+  if (m_type == FCFS)
+  {
+    int firstIdleCoreFound = scheduler_idle_core_finder();
+    if (firstIdleCoreFound != -1)
+    {
+      // Signal that the core at firstIdleCoreFound is being used
+      m_coreArr[firstIdleCoreFound] = 1;
+      return firstIdleCoreFound;
+    }
+  }
+
+  temp->pid = job_number;
+  temp->arrivalTime = running_time;
+  temp->priority = priority;
+  priqueue_offer(&q, temp);
+
 	return -1;
 }
 
+int scheduler_idle_core_finder(void)
+{
+  int i;
+  for (i = 0; i < m_cores; i++)
+  {
+    if (m_coreArr[i] == 0)
+    {
+      return i;
+    }
+  }
+
+  return -1;
+}
 
 /**
   Called when a job has completed execution.
@@ -96,6 +138,17 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
  */
 int scheduler_job_finished(int core_id, int job_number, int time)
 {
+  if (m_type == FCFS)
+  {
+    // Free up the core where the finished job has completed
+    m_coreArr[core_id] = 0;
+  }
+
+  if (priqueue_size(&q) != 0)
+  {
+    m_coreArr[core_id] = 1;
+    return *((int*)priqueue_poll(&q));
+  }
 	return -1;
 }
 
@@ -183,5 +236,5 @@ void scheduler_clean_up()
  */
 void scheduler_show_queue()
 {
-
+  priqueue_print(&q);
 }

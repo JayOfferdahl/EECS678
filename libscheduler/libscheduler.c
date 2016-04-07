@@ -18,14 +18,24 @@ int FCFScompare(const void * a, const void * b)
   return 1;
 }
 
+int SJFcompare(const void * a, const void * b)
+{
+  return ((*(job_t*)a).arrivalTime - (*(job_t*)b).arrivalTime);
+}
+
 int PRIcompare(const void * a, const void * b)
 {
   return (*(job_t *)a).priority - (*(job_t *)b).priority;
 }
 
-int SJFcompare(const void *a, const void *b)
+int PPRIcompare(const void * a, const void * b)
 {
-  return ((*(job_t*)a).arrivalTime - (*(job_t*)b).arrivalTime);
+  int compare = (*(job_t *)a).priority - (*(job_t *)b).priority;
+
+  if(compare == 0)
+    return (*(job_t *)a).arrivalTime - (*(job_t *)b).arrivalTime;
+  else
+    return compare;
 }
 
 /**
@@ -68,9 +78,8 @@ void scheduler_start_up(int cores, scheme_t scheme)
   }
   else if (m_type == PPRI)
   {
-    priqueue_init(&q, PRIcompare);
+    priqueue_init(&q, PPRIcompare);
   }
-  
 }
 
 
@@ -104,7 +113,7 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
   temp->arrivalTime = running_time;
   temp->priority = priority;
 
-  if (m_type == FCFS)
+  if (m_type == FCFS || m_type == SJF || m_type == PRI)
   {
     if (firstIdleCoreFound != -1)
     {
@@ -113,7 +122,7 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
       return firstIdleCoreFound;
     }
   }
-  else if (m_type == SJF)
+  else if (m_type == PPRI)
   {
     if (firstIdleCoreFound != -1)
     {
@@ -121,20 +130,35 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
       m_coreArr[firstIdleCoreFound] = temp;
       return firstIdleCoreFound;
     }
-  }
-  else if (m_type == PRI)
-  {
-    if (firstIdleCoreFound != -1)
+    // No idle cores, preempt a job with lower priority, if any
+    else
     {
-      // Signal that the core at firstIdleCoreFound is being used
-      m_coreArr[firstIdleCoreFound] = temp;
-      return firstIdleCoreFound;
+      int i, lowestPriSoFar = m_coreArr[0]->priority, lowestPriCore = 0;
+
+      for(i = 0; i < m_cores; i++) {
+        // Lower priority than we've seen
+        if(m_coreArr[i]->priority > lowestPriSoFar)
+        {
+          lowestPriSoFar = m_coreArr[i]->priority;
+          lowestPriCore = i;
+        }
+      }
+
+      // We have the lowest priority and the core it's running on, compare to new job
+      if(lowestPriSoFar > temp->priority)
+      {
+        // Send the job running on the found core to the priqueue, put temp in its place
+        priqueue_offer(&q, m_coreArr[lowestPriCore]);
+        m_coreArr[lowestPriCore] = temp;
+        return lowestPriCore;
+      }
+      // Else, put temp on the queue and signal no scheduling changes
     }
   }
 
   // If at this step, no scheduling changes should be made
   priqueue_offer(&q, temp);
-	return -1;
+  return -1;
 }
 
 int scheduler_idle_core_finder(void)
@@ -167,9 +191,10 @@ int scheduler_idle_core_finder(void)
  */
 int scheduler_job_finished(int core_id, int job_number, int time)
 {
-  if (m_type == FCFS || m_type == SJF || m_type == PRI)
+  if (m_type == FCFS || m_type == SJF || m_type == PRI || m_type == PPRI)
   {
     // Free up the core where the finished job has completed
+    free(m_coreArr[core_id]);
     m_coreArr[core_id] = NULL;
   }
 
@@ -180,7 +205,7 @@ int scheduler_job_finished(int core_id, int job_number, int time)
 
     return temp->pid;
   }
-	return -1;
+  return -1;
 }
 
 
@@ -199,7 +224,7 @@ int scheduler_job_finished(int core_id, int job_number, int time)
  */
 int scheduler_quantum_expired(int core_id, int time)
 {
-	return -1;
+  return -1;
 }
 
 
@@ -212,7 +237,7 @@ int scheduler_quantum_expired(int core_id, int time)
  */
 float scheduler_average_waiting_time()
 {
-	return 0.0;
+  return 0.0;
 }
 
 
@@ -225,7 +250,7 @@ float scheduler_average_waiting_time()
  */
 float scheduler_average_turnaround_time()
 {
-	return 0.0;
+  return 0.0;
 }
 
 
@@ -238,7 +263,7 @@ float scheduler_average_turnaround_time()
  */
 float scheduler_average_response_time()
 {
-	return 0.0;
+  return 0.0;
 }
 
 

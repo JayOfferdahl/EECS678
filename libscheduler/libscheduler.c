@@ -64,7 +64,7 @@ void scheduler_start_up(int cores, scheme_t scheme)
 
   m_type = scheme;
 
-  if (m_type == FCFS)
+  if (m_type == FCFS || m_type == RR)
   {
     priqueue_init(&q, FCFScompare);
   }
@@ -113,7 +113,7 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
   temp->arrivalTime = running_time;
   temp->priority = priority;
 
-  if (m_type == FCFS || m_type == SJF || m_type == PRI)
+  if (m_type == FCFS || m_type == SJF || m_type == PRI || m_type == RR)
   {
     if (firstIdleCoreFound != -1)
     {
@@ -226,7 +226,7 @@ int scheduler_idle_core_finder(void)
  */
 int scheduler_job_finished(int core_id, int job_number, int time)
 {
-  if (m_type == FCFS || m_type == SJF || m_type == PSJF || m_type == PRI || m_type == PPRI)
+  if (m_type == FCFS || m_type == SJF || m_type == PSJF || m_type == PRI || m_type == PPRI || m_type == RR)
   {
     // Free up the core where the finished job has completed
     free(m_coreArr[core_id]);
@@ -259,7 +259,24 @@ int scheduler_job_finished(int core_id, int job_number, int time)
  */
 int scheduler_quantum_expired(int core_id, int time)
 {
-  return -1;
+  job_t* jobCurrentlyOnSpecifiedCore = m_coreArr[core_id];
+
+  if (jobCurrentlyOnSpecifiedCore == NULL)
+  {
+    printf("FUCKOFFFAGET\n");
+    if (priqueue_size(&q) == 0)
+    {
+      // Core remains idle
+      return -1;
+    }
+  }
+  else
+  {
+    priqueue_offer(&q, jobCurrentlyOnSpecifiedCore);
+  }
+
+  m_coreArr[core_id] = priqueue_poll(&q);
+  return m_coreArr[core_id]->pid;
 }
 
 

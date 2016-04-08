@@ -134,14 +134,12 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
     int longestRunTimeFound = -1;
     int indexOfJobWithLongestRuntime;
 
-    // Update all jobs processTime that have been running on cores 
     for (i = 0; i < m_cores; i++)
     {
+      // Update this job's processTime
       m_coreArr[i]->processTime = m_coreArr[i]->processTime - (time - m_coreArr[i]->lastCheckedTime);
-    }
+      m_coreArr[i]->lastCheckedTime = time;
 
-    for (i = 0; i < m_cores; i++)
-    {
       if (m_coreArr[i]->processTime > longestRunTimeFound)
       {
         longestRunTimeFound = m_coreArr[i]->processTime;
@@ -158,13 +156,13 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
         m_coreArr[indexOfJobWithLongestRuntime]->responseTime = -1;
       }
 
-      job_t *temp2 = m_coreArr[indexOfJobWithLongestRuntime];
+      priqueue_offer(&q, m_coreArr[indexOfJobWithLongestRuntime]);
       m_coreArr[indexOfJobWithLongestRuntime] = temp;
+
       if(m_coreArr[indexOfJobWithLongestRuntime]->responseTime == -1)
       {
         m_coreArr[indexOfJobWithLongestRuntime]->responseTime = time - m_coreArr[indexOfJobWithLongestRuntime]->arrivalTime;
       }
-      priqueue_offer(&q, temp2);
       return indexOfJobWithLongestRuntime;
     }
   }
@@ -174,12 +172,13 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
     int i, lowestPriSoFar = m_coreArr[0]->priority, lowestPriCore = 0;
 
     for(i = 0; i < m_cores; i++) {
-      // Check first for lower priority, if they have the same, check for a larger arrival time
+      // Check first for lower priority
       if(m_coreArr[i]->priority > lowestPriSoFar)
       {
         lowestPriSoFar = m_coreArr[i]->priority;
         lowestPriCore = i;
       }
+      // They have the same priority, check for a larger arrival time
       else if(m_coreArr[i]->priority == lowestPriSoFar 
           && m_coreArr[i]->arrivalTime > m_coreArr[lowestPriCore]->arrivalTime)
       {

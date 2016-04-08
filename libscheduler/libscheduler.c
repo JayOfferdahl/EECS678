@@ -52,6 +52,8 @@ void scheduler_start_up(int cores, scheme_t scheme)
   m_coreArr = malloc(cores * sizeof(job_t));
 
   m_waitingTime = 0.0;
+  m_responseTime = 0.0;
+  m_turnaroundTime = 0.0;
   m_numJobs = 0;
 
   // Initializes core array so that all cores are in unused state at startup
@@ -107,6 +109,7 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
   temp->pid = job_number;
   temp->arrivalTime = time;
   temp->priority = priority;
+  temp->originalProcessTime = running_time;
   temp->processTime = running_time;
   temp->responseTime = -1;
 
@@ -114,18 +117,15 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
   {
     // Signal that the core at firstIdleCoreFound is being used
     m_coreArr[firstIdleCoreFound] = temp;
-    if(m_coreArr[firstIdleCoreFound]->responseTime == -1)
-    {
-      m_coreArr[firstIdleCoreFound]->responseTime = time - m_coreArr[firstIdleCoreFound]->arrivalTime;
-    }
+    m_coreArr[firstIdleCoreFound]->responseTime = time - m_coreArr[firstIdleCoreFound]->arrivalTime;
+
     if (m_type == PSJF)
     {
       temp->lastCheckedTime = time;
     }
     return firstIdleCoreFound;
   }
-
-  if (m_type == PSJF)
+  else if (m_type == PSJF)
   {
     // Preemptive portion of SFJ
     // Search through all of the cores, and retrieve the longest run time of a given job
@@ -152,6 +152,12 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
     // If the job found with the longest remaining runtime is longer than job trying to be added, replace the job on the core
     if (longestRunTimeFound > running_time)
     {
+      // If we just scheduled this job and it's getting pre-empted, reset the response time
+      if(m_coreArr[indexOfJobWithLongestRuntime]->responseTime == time - m_coreArr[indexOfJobWithLongestRuntime]->arrivalTime)
+      {
+        m_coreArr[indexOfJobWithLongestRuntime]->responseTime = -1;
+      }
+
       job_t *temp2 = m_coreArr[indexOfJobWithLongestRuntime];
       m_coreArr[indexOfJobWithLongestRuntime] = temp;
       if(m_coreArr[indexOfJobWithLongestRuntime]->responseTime == -1)
@@ -168,10 +174,15 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
     int i, lowestPriSoFar = m_coreArr[0]->priority, lowestPriCore = 0;
 
     for(i = 0; i < m_cores; i++) {
-      // Lower priority than we've seen
+      // Check first for lower priority, if they have the same, check for a larger arrival time
       if(m_coreArr[i]->priority > lowestPriSoFar)
       {
         lowestPriSoFar = m_coreArr[i]->priority;
+        lowestPriCore = i;
+      }
+      else if(m_coreArr[i]->priority == lowestPriSoFar 
+          && m_coreArr[i]->arrivalTime > m_coreArr[lowestPriCore]->arrivalTime)
+      {
         lowestPriCore = i;
       }
     }
@@ -179,6 +190,12 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
     // We have the lowest priority and the core it's running on, compare to new job
     if(lowestPriSoFar > temp->priority)
     {
+      // If we just scheduled this job and it's getting pre-empted, reset the response time
+      if(m_coreArr[lowestPriCore]->responseTime == time - m_coreArr[lowestPriCore]->arrivalTime)
+      {
+        m_coreArr[lowestPriCore]->responseTime = -1;
+      }
+
       // Send the job running on the found core to the priqueue, put temp in its place
       priqueue_offer(&q, m_coreArr[lowestPriCore]);
       m_coreArr[lowestPriCore] = temp;
@@ -229,7 +246,7 @@ int scheduler_idle_core_finder(void)
 int scheduler_job_finished(int core_id, int job_number, int time)
 {
   // Add this job's waiting time to the avg waiting time
-  m_waitingTime += time - m_coreArr[core_id]->arrivalTime - m_coreArr[core_id]->processTime;
+  m_waitingTime += time - m_coreArr[core_id]->arrivalTime - m_coreArr[core_id]->originalProcessTime;
   m_turnaroundTime += time - m_coreArr[core_id]->arrivalTime;
   m_responseTime += m_coreArr[core_id]->responseTime;
   m_numJobs++;

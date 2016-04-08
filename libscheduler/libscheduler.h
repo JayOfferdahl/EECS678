@@ -19,6 +19,7 @@ typedef struct _job_t
   int pid;
   int arrivalTime;
   int priority;
+  int originalProcessTime;
   int processTime;
   int responseTime;
   int lastCheckedTime;

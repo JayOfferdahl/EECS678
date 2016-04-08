@@ -110,104 +110,77 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
   temp->processTime = running_time;
   temp->responseTime = -1;
 
-  if (m_type == FCFS || m_type == SJF || m_type == PRI || m_type == RR)
+  if (firstIdleCoreFound != -1)
   {
-    if (firstIdleCoreFound != -1)
+    // Signal that the core at firstIdleCoreFound is being used
+    m_coreArr[firstIdleCoreFound] = temp;
+    if(m_coreArr[firstIdleCoreFound]->responseTime == -1)
     {
-      // Signal that the core at firstIdleCoreFound is being used
-      m_coreArr[firstIdleCoreFound] = temp;
-      if(m_coreArr[firstIdleCoreFound]->responseTime == -1)
-      {
-        m_coreArr[firstIdleCoreFound]->responseTime = time - m_coreArr[firstIdleCoreFound]->arrivalTime;
-      }
-      return firstIdleCoreFound;
+      m_coreArr[firstIdleCoreFound]->responseTime = time - m_coreArr[firstIdleCoreFound]->arrivalTime;
     }
+    return firstIdleCoreFound;
   }
-  else if (m_type == PSJF)
+
+  if (m_type == PSJF)
   {
-    if (firstIdleCoreFound != -1)
-    {
-      m_coreArr[firstIdleCoreFound] = temp;
-      if(m_coreArr[firstIdleCoreFound]->responseTime == -1)
-      {
-        m_coreArr[firstIdleCoreFound]->responseTime = time - m_coreArr[firstIdleCoreFound]->arrivalTime;
-      }
-      return firstIdleCoreFound;
-    }
     // Preemptive portion of SFJ
-    else
+    // Search through all of the cores, and retrieve the longest run time of a given job
+    // if the longest run time is longer than the run time of the job trying to be added, replace the job and put it back on the queue
+    int i;
+    int longestRunTimeFound = -1;
+    int indexOfJobWithLongestRuntime;
+
+    for (i = 0; i < m_cores; i++)
     {
-      // Search through all of the cores, and retrieve the longest run time of a given job
-      // if the longest run time is longer than the run time of the job trying to be added, replace the job and put it back on the queue
-      int i;
-      int longestRunTimeFound = -1;
-      int indexOfJobWithLongestRuntime;
-
-      for (i = 0; i < m_cores; i++)
+      if (m_coreArr[i]->processTime > longestRunTimeFound)
       {
-        if (m_coreArr[i]->processTime > longestRunTimeFound)
-        {
-          longestRunTimeFound = m_coreArr[i]->processTime;
-          indexOfJobWithLongestRuntime = i;
-        }
+        longestRunTimeFound = m_coreArr[i]->processTime;
+        indexOfJobWithLongestRuntime = i;
       }
+    }
 
-      // If the job found with the longest runtime is longer than job trying to be added, replace the job on the core
-      if (longestRunTimeFound > running_time)
+    // If the job found with the longest runtime is longer than job trying to be added, replace the job on the core
+    if (longestRunTimeFound > running_time)
+    {
+      job_t *temp2 = m_coreArr[indexOfJobWithLongestRuntime];
+      m_coreArr[indexOfJobWithLongestRuntime] = temp;
+      if(m_coreArr[indexOfJobWithLongestRuntime]->responseTime == -1)
       {
-        job_t *temp2 = m_coreArr[indexOfJobWithLongestRuntime];
-        m_coreArr[indexOfJobWithLongestRuntime] = temp;
-        if(m_coreArr[indexOfJobWithLongestRuntime]->responseTime == -1)
-        {
-          m_coreArr[indexOfJobWithLongestRuntime]->responseTime = time - m_coreArr[indexOfJobWithLongestRuntime]->arrivalTime;
-        }
-        priqueue_offer(&q, temp2);
-        return indexOfJobWithLongestRuntime;
+        m_coreArr[indexOfJobWithLongestRuntime]->responseTime = time - m_coreArr[indexOfJobWithLongestRuntime]->arrivalTime;
       }
+      priqueue_offer(&q, temp2);
+      return indexOfJobWithLongestRuntime;
     }
   }
   else if (m_type == PPRI)
   {
-    if (firstIdleCoreFound != -1)
-    {
-      // Signal that the core at firstIdleCoreFound is being used
-      m_coreArr[firstIdleCoreFound] = temp;
-      if(m_coreArr[firstIdleCoreFound]->responseTime == -1)
-      {
-        m_coreArr[firstIdleCoreFound]->responseTime = time - m_coreArr[firstIdleCoreFound]->arrivalTime;
-      }
-      return firstIdleCoreFound;
-    }
     // No idle cores, preempt a job with lower priority, if any
-    else
-    {
-      int i, lowestPriSoFar = m_coreArr[0]->priority, lowestPriCore = 0;
+    int i, lowestPriSoFar = m_coreArr[0]->priority, lowestPriCore = 0;
 
-      for(i = 0; i < m_cores; i++) {
-        // Lower priority than we've seen
-        if(m_coreArr[i]->priority > lowestPriSoFar)
-        {
-          lowestPriSoFar = m_coreArr[i]->priority;
-          lowestPriCore = i;
-        }
-      }
-
-      // We have the lowest priority and the core it's running on, compare to new job
-      if(lowestPriSoFar > temp->priority)
+    for(i = 0; i < m_cores; i++) {
+      // Lower priority than we've seen
+      if(m_coreArr[i]->priority > lowestPriSoFar)
       {
-        // Send the job running on the found core to the priqueue, put temp in its place
-        priqueue_offer(&q, m_coreArr[lowestPriCore]);
-        m_coreArr[lowestPriCore] = temp;
-
-        if(m_coreArr[lowestPriCore]->responseTime == -1)
-        {
-          m_coreArr[lowestPriCore]->responseTime = time - m_coreArr[lowestPriCore]->arrivalTime;
-        }
-
-        return lowestPriCore;
+        lowestPriSoFar = m_coreArr[i]->priority;
+        lowestPriCore = i;
       }
-      // Else, put temp on the queue and signal no scheduling changes
     }
+
+    // We have the lowest priority and the core it's running on, compare to new job
+    if(lowestPriSoFar > temp->priority)
+    {
+      // Send the job running on the found core to the priqueue, put temp in its place
+      priqueue_offer(&q, m_coreArr[lowestPriCore]);
+      m_coreArr[lowestPriCore] = temp;
+
+      if(m_coreArr[lowestPriCore]->responseTime == -1)
+      {
+        m_coreArr[lowestPriCore]->responseTime = time - m_coreArr[lowestPriCore]->arrivalTime;
+      }
+
+      return lowestPriCore;
+    }
+    // Else, put temp on the queue and signal no scheduling changes
   }
 
   // If at this step, no scheduling changes should be made

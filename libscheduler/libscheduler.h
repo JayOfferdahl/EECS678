@@ -19,11 +19,18 @@ typedef struct _job_t
   int pid;
   int arrivalTime;
   int priority;
+  int processTime;
+  int responseTime;
 } job_t;
 
 int m_cores;
 job_t **m_coreArr;
 scheme_t m_type;
+
+int m_numJobs;
+float m_waitingTime;
+float m_turnaroundTime;
+float m_responseTime;
 
 void  scheduler_start_up               (int cores, scheme_t scheme);
 int   scheduler_new_job                (int job_number, int time, int running_time, int priority);

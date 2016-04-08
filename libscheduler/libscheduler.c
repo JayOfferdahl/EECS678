@@ -20,15 +20,10 @@ int FCFScompare(const void * a, const void * b)
 
 int SJFcompare(const void * a, const void * b)
 {
-  return ((*(job_t*)a).arrivalTime - (*(job_t*)b).arrivalTime);
+  return ((*(job_t*)a).processTime - (*(job_t*)b).processTime);
 }
 
 int PRIcompare(const void * a, const void * b)
-{
-  return (*(job_t *)a).priority - (*(job_t *)b).priority;
-}
-
-int PPRIcompare(const void * a, const void * b)
 {
   int compare = (*(job_t *)a).priority - (*(job_t *)b).priority;
 
@@ -37,6 +32,7 @@ int PPRIcompare(const void * a, const void * b)
   else
     return compare;
 }
+
 
 /**
   Initalizes the scheduler.
@@ -55,6 +51,9 @@ void scheduler_start_up(int cores, scheme_t scheme)
   m_cores = cores;
   m_coreArr = malloc(cores * sizeof(job_t));
 
+  m_waitingTime = 0.0;
+  m_numJobs = 0;
+
   // Initializes core array so that all cores are in unused state at startup
   int i;
   for (i = 0; i < cores; i++)
@@ -72,13 +71,9 @@ void scheduler_start_up(int cores, scheme_t scheme)
   {
     priqueue_init(&q, SJFcompare);
   }
-  else if (m_type == PRI)
+  else if (m_type == PRI || m_type == PPRI)
   {
     priqueue_init(&q, PRIcompare);
-  }
-  else if (m_type == PPRI)
-  {
-    priqueue_init(&q, PPRIcompare);
   }
 }
 
@@ -110,8 +105,10 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
   job_t *temp = malloc(sizeof(job_t));
 
   temp->pid = job_number;
-  temp->arrivalTime = running_time;
+  temp->arrivalTime = time;
   temp->priority = priority;
+  temp->processTime = running_time;
+  temp->responseTime = -1;
 
   if (m_type == FCFS || m_type == SJF || m_type == PRI || m_type == RR)
   {
@@ -119,6 +116,10 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
     {
       // Signal that the core at firstIdleCoreFound is being used
       m_coreArr[firstIdleCoreFound] = temp;
+      if(m_coreArr[firstIdleCoreFound]->responseTime == -1)
+      {
+        m_coreArr[firstIdleCoreFound]->responseTime = time - m_coreArr[firstIdleCoreFound]->arrivalTime;
+      }
       return firstIdleCoreFound;
     }
   }
@@ -127,6 +128,10 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
     if (firstIdleCoreFound != -1)
     {
       m_coreArr[firstIdleCoreFound] = temp;
+      if(m_coreArr[firstIdleCoreFound]->responseTime == -1)
+      {
+        m_coreArr[firstIdleCoreFound]->responseTime = time - m_coreArr[firstIdleCoreFound]->arrivalTime;
+      }
       return firstIdleCoreFound;
     }
     // Preemptive portion of SFJ
@@ -140,9 +145,9 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
 
       for (i = 0; i < m_cores; i++)
       {
-        if (m_coreArr[i]->arrivalTime > longestRunTimeFound)
+        if (m_coreArr[i]->processTime > longestRunTimeFound)
         {
-          longestRunTimeFound = m_coreArr[i]->arrivalTime;
+          longestRunTimeFound = m_coreArr[i]->processTime;
           indexOfJobWithLongestRuntime = i;
         }
       }
@@ -152,6 +157,10 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
       {
         job_t *temp2 = m_coreArr[indexOfJobWithLongestRuntime];
         m_coreArr[indexOfJobWithLongestRuntime] = temp;
+        if(m_coreArr[indexOfJobWithLongestRuntime]->responseTime == -1)
+        {
+          m_coreArr[indexOfJobWithLongestRuntime]->responseTime = time - m_coreArr[indexOfJobWithLongestRuntime]->arrivalTime;
+        }
         priqueue_offer(&q, temp2);
         return indexOfJobWithLongestRuntime;
       }
@@ -163,6 +172,10 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
     {
       // Signal that the core at firstIdleCoreFound is being used
       m_coreArr[firstIdleCoreFound] = temp;
+      if(m_coreArr[firstIdleCoreFound]->responseTime == -1)
+      {
+        m_coreArr[firstIdleCoreFound]->responseTime = time - m_coreArr[firstIdleCoreFound]->arrivalTime;
+      }
       return firstIdleCoreFound;
     }
     // No idle cores, preempt a job with lower priority, if any
@@ -185,6 +198,12 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
         // Send the job running on the found core to the priqueue, put temp in its place
         priqueue_offer(&q, m_coreArr[lowestPriCore]);
         m_coreArr[lowestPriCore] = temp;
+
+        if(m_coreArr[lowestPriCore]->responseTime == -1)
+        {
+          m_coreArr[lowestPriCore]->responseTime = time - m_coreArr[lowestPriCore]->arrivalTime;
+        }
+
         return lowestPriCore;
       }
       // Else, put temp on the queue and signal no scheduling changes
@@ -226,17 +245,25 @@ int scheduler_idle_core_finder(void)
  */
 int scheduler_job_finished(int core_id, int job_number, int time)
 {
-  if (m_type == FCFS || m_type == SJF || m_type == PSJF || m_type == PRI || m_type == PPRI || m_type == RR)
-  {
-    // Free up the core where the finished job has completed
-    free(m_coreArr[core_id]);
-    m_coreArr[core_id] = NULL;
-  }
+  // Add this job's waiting time to the avg waiting time
+  m_waitingTime += time - m_coreArr[core_id]->arrivalTime - m_coreArr[core_id]->processTime;
+  m_turnaroundTime += time - m_coreArr[core_id]->arrivalTime;
+  m_responseTime += m_coreArr[core_id]->responseTime;
+  m_numJobs++;
+
+  // Free up the core where the finished job has completed
+  free(m_coreArr[core_id]);
+  m_coreArr[core_id] = NULL;
 
   if (priqueue_size(&q) != 0)
   {
     job_t* temp = (job_t*)priqueue_poll(&q);
+
     m_coreArr[core_id] = temp;
+    if(m_coreArr[core_id]->responseTime == -1)
+    {
+      m_coreArr[core_id]->responseTime = time - m_coreArr[core_id]->arrivalTime;
+    }
 
     return temp->pid;
   }
@@ -263,7 +290,6 @@ int scheduler_quantum_expired(int core_id, int time)
 
   if (jobCurrentlyOnSpecifiedCore == NULL)
   {
-    printf("FUCKOFFFAGET\n");
     if (priqueue_size(&q) == 0)
     {
       // Core remains idle
@@ -276,6 +302,10 @@ int scheduler_quantum_expired(int core_id, int time)
   }
 
   m_coreArr[core_id] = priqueue_poll(&q);
+  if(m_coreArr[core_id]->responseTime == -1)
+  {
+    m_coreArr[core_id]->responseTime = time - m_coreArr[core_id]->arrivalTime;
+  }
   return m_coreArr[core_id]->pid;
 }
 
@@ -289,7 +319,7 @@ int scheduler_quantum_expired(int core_id, int time)
  */
 float scheduler_average_waiting_time()
 {
-  return 0.0;
+  return m_waitingTime / m_numJobs;
 }
 
 
@@ -302,7 +332,7 @@ float scheduler_average_waiting_time()
  */
 float scheduler_average_turnaround_time()
 {
-  return 0.0;
+  return m_turnaroundTime / m_numJobs;
 }
 
 
@@ -315,7 +345,7 @@ float scheduler_average_turnaround_time()
  */
 float scheduler_average_response_time()
 {
-  return 0.0;
+  return m_responseTime / m_numJobs;
 }
 
 

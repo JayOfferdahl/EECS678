@@ -310,7 +310,15 @@ float scheduler_average_response_time()
 */
 void scheduler_clean_up()
 {
-
+  int i;
+  for (i = 0; i < m_cores; i++)
+  {
+    if (m_coreArr[i] != NULL)
+    {
+      free(m_coreArr[i]);
+    }
+  }
+  free(m_coreArr);
 }
 
 

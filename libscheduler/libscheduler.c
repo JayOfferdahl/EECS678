@@ -118,6 +118,10 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
     {
       m_coreArr[firstIdleCoreFound]->responseTime = time - m_coreArr[firstIdleCoreFound]->arrivalTime;
     }
+    if (m_type == PSJF)
+    {
+      temp->lastCheckedTime = time;
+    }
     return firstIdleCoreFound;
   }
 
@@ -130,6 +134,12 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
     int longestRunTimeFound = -1;
     int indexOfJobWithLongestRuntime;
 
+    // Update all jobs processTime that have been running on cores 
+    for (i = 0; i < m_cores; i++)
+    {
+      m_coreArr[i]->processTime = m_coreArr[i]->processTime - (time - m_coreArr[i]->lastCheckedTime);
+    }
+
     for (i = 0; i < m_cores; i++)
     {
       if (m_coreArr[i]->processTime > longestRunTimeFound)
@@ -139,7 +149,7 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
       }
     }
 
-    // If the job found with the longest runtime is longer than job trying to be added, replace the job on the core
+    // If the job found with the longest remaining runtime is longer than job trying to be added, replace the job on the core
     if (longestRunTimeFound > running_time)
     {
       job_t *temp2 = m_coreArr[indexOfJobWithLongestRuntime];
@@ -231,7 +241,10 @@ int scheduler_job_finished(int core_id, int job_number, int time)
   if (priqueue_size(&q) != 0)
   {
     job_t* temp = (job_t*)priqueue_poll(&q);
-
+    if (m_type == PSJF)
+    {
+      temp->lastCheckedTime = time;
+    }
     m_coreArr[core_id] = temp;
     if(m_coreArr[core_id]->responseTime == -1)
     {

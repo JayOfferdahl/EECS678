@@ -21,6 +21,7 @@ typedef struct _job_t
   int priority;
   int processTime;
   int responseTime;
+  int lastCheckedTime;
 } job_t;
 
 int m_cores;

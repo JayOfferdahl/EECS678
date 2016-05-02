@@ -52,10 +52,8 @@ typedef struct {
 	struct list_head list;
 
 	/* TODO: DECLARE NECESSARY MEMBER VARIABLES */
-
-	// Keeps track of the order of this page (exponent)
-	// (2^10 = 1k, 2^11 = 2k, 2^20 = 1024k = 1M, 2^N ...)
-	int page_order;
+	int block_size_order;
+	int occupied;
 } page_t;
 
 /**************************************************************************
@@ -85,16 +83,18 @@ void buddy_init()
 {
 	int i;
 	int n_pages = (1<<MAX_ORDER) / PAGE_SIZE;
-	int order = MIN_ORDER;
 	for (i = 0; i < n_pages; i++) {
 		/* TODO: INITIALIZE PAGE STRUCTURES */
 
 		// Initialize the page list
-		INIT_LIST_HEAD(&g_pages[i]);
+		INIT_LIST_HEAD(&g_pages[i].list);
+		g_pages[i].block_size_order = -1;
+		g_pages[i].occupied = 0;
 
-		// Initialize the page order
-		g_pages[i].page_order = order++;
+		if(i != 0)
+			list_add(&g_pages[i].list, &g_pages[0].list);
 	}
+	g_pages[0].block_size_order = MAX_ORDER;
 
 	/* initialize freelist */
 	for (i = MIN_ORDER; i <= MAX_ORDER; i++) {
@@ -121,7 +121,61 @@ void buddy_init()
  */
 void *buddy_alloc(int size)
 {
-	/* TODO: IMPLEMENT THIS FUNCTION */
+	// Determine what order is needed to allocate this memory
+	int size_order = 1,
+		request_size = size,
+		request_page,
+		request_page_length;
+
+	while((request_size /= 2) > 0)
+		size_order++;
+
+#if USE_DEBUG
+	printf("Requested size is %i, order of %i\n", size, size_order);
+#endif
+
+	// Find the next available memory
+	for(int i = size_order; i < MAX_ORDER; i++) {
+
+		// If there's an available block, begin partitioning it
+		if(!list_empty(free_area[i])) {
+
+		#if USE_DEBUG
+			printf("Found empty block of order %i, partitioning...\n", i);
+		#endif
+
+			// Break this block down until we have an appropriate size. Once 
+			// we've determined we have a block big enough, return it's address
+			for(int j = i; j >= size_order; j--) {
+				request_page_length = (1 << j) / PAGE_SIZE;
+				request_page = find_free_block_page(j); // TODO: make this function which returns the first index of free memory of this size
+
+				// If we're at the smallest block to allocate the request, return the address
+				if(j == size_order) {
+					void *request_addr = PAGE_TO_ADDR(request_page);
+
+				#if USE_DEBUG
+					printf("Marking pages %i through %i as occupied...\n", request_page, request_page + request_page_length);
+				#endif
+
+					// Mark each page as occupied
+					while(request_page_length > 0)
+						g_pages[request_page + request_page_length--].occupied = 1;
+
+					return request_addr;
+				}
+				// Else, break the block down and appropriately add half to free_area
+				else {
+					// Break the list into two halves
+					
+					// Add the right block to free_area
+					list_add(g_pages[request_page + request_page_length].list, free_area[j]);
+				}
+			}
+		}
+	}
+
+	// No blocks big enough to fulfill this request are available.
 	return NULL;
 }
 

@@ -127,18 +127,19 @@ void buddy_init()
 void *buddy_alloc(int size)
 {
 	// Check if out of bounds
-	if(size > (1 << MAX_ORDER)) {
+	if(size > (1 << MAX_ORDER) || size <= 0) {
+	#if USE_DEBUG
+		printf("Error: Invalid allocation request: %i is not a valid request size\n", size);
+	#endif
 		return NULL;
 	}
 
 	// Determine what order is needed to allocate this memory
-	int size_order = 1,
-		request_size = size,
-		i;
+	int size_order = MIN_ORDER, i;
 
-	while((request_size /= 2) > 0)
+	while(size_order <= MAX_ORDER && (1 << size_order) < size) {
 		size_order++;
-
+	}
 
 #if USE_DEBUG
 	printf("Requested size is %i, order of %i\n", size, size_order);
@@ -178,12 +179,8 @@ void *buddy_alloc(int size)
 				#if USE_DEBUG
 					printf("Entering recursion...\n");
 				#endif
-				left = &g_pages[ADDR_TO_PAGE(buddy_alloc((1 << (size_order))))];
+				left = &g_pages[ADDR_TO_PAGE(buddy_alloc((1 << (size_order + 1))))];
 
-			#if USE_DEBUG
-				if(left == NULL)
-					printf("Recursive call to buddy_alloc returned NULL...please evaluate\n");
-			#endif
 				// Calculate the block's index to the right of left
 				request_page_index = left->index + (1 << size_order) / PAGE_SIZE;
 				right = &g_pages[request_page_index];

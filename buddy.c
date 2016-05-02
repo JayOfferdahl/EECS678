@@ -50,7 +50,12 @@
  **************************************************************************/
 typedef struct {
 	struct list_head list;
+
 	/* TODO: DECLARE NECESSARY MEMBER VARIABLES */
+
+	// Keeps track of the order of this page (exponent)
+	// (2^10 = 1k, 2^11 = 2k, 2^20 = 1024k = 1M, 2^N ...)
+	int page_order;
 } page_t;
 
 /**************************************************************************
@@ -80,8 +85,15 @@ void buddy_init()
 {
 	int i;
 	int n_pages = (1<<MAX_ORDER) / PAGE_SIZE;
+	int order = MIN_ORDER;
 	for (i = 0; i < n_pages; i++) {
 		/* TODO: INITIALIZE PAGE STRUCTURES */
+
+		// Initialize the page list
+		INIT_LIST_HEAD(&g_pages[i]);
+
+		// Initialize the page order
+		g_pages[i].page_order = order++;
 	}
 
 	/* initialize freelist */

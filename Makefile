@@ -1,4 +1,4 @@
-STUDENT_LASTNAMES = XXXXXXX
+STUDENT_LASTNAMES = Offerdahl_Davidson
 PROGNAME = buddy
 
 CC = gcc -std=gnu11
@@ -12,7 +12,7 @@ CFLAGS = -Wall -g
 ####################################################################
 # NOTE: The submission scripts assume all files in `CFILES` end with
 # .c and all files in `HFILES` end in .h
-CFILES = simulator.c buddy.c
+CFILES = buddy.c simulator.c
 HFILES = buddy.h list.h
 
 # Add libraries that need linked as needed (e.g. -lm -lpthread)

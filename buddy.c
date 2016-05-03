@@ -213,7 +213,41 @@ void *buddy_alloc(int size)
  */
 void buddy_free(void *addr)
 {
-	/* TODO: IMPLEMENT THIS FUNCTION */
+	// Store the page index of the memory we want to free
+	int request_page_index = ADDR_TO_PAGE(addr),
+		request_page_order = g_pages[request_page_index].block_size_order;
+
+	page_t *temp;
+	struct list_head *current;
+
+	// Check this block size and all those larger than it
+	for(; request_page_order <= MAX_ORDER; request_page_order++) {
+		temp = NULL;
+
+		// Loop
+		for(current = free_area[request_page_order].next; 
+			current != &free_area[request_page_order];
+			current = current->prev) {
+
+			// Get the entry from this page
+			temp = list_entry(current, page_t, list);
+			if(!temp) {
+				g_pages[request_page_index].block_size_order = -1;
+				list_add(&g_pages[request_page_index].list, &free_area[request_page_order]);
+				return;
+			}
+			else if(temp->mem == BUDDY_ADDR(addr, request_page_order)) {
+				g_pages[request_page_index].block_size_order = -1;
+				list_add(&g_pages[request_page_index].list, &free_area[request_page_order]);
+				return;
+			}
+		}
+
+		if((char*) addr > temp->mem)
+			addr = temp->mem;
+
+		list_del(&(temp->list));
+	}
 }
 
 /**

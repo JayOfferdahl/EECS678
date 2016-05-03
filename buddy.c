@@ -57,8 +57,8 @@ typedef struct {
 	// The index of this page
 	int index;
 
-	// The memory stored at this page
-	char *mem;
+	// The address of this page
+	char *block_addr;
 } page_t;
 
 /**************************************************************************
@@ -96,7 +96,7 @@ void buddy_init()
 		// Initialize the page variables
 		g_pages[i].block_size_order = -1;
 		g_pages[i].index = i;
-		g_pages[i].mem = PAGE_TO_ADDR(i);
+		g_pages[i].block_addr = PAGE_TO_ADDR(i);
 	}
 	// To begin, it's all one block
 	g_pages[0].block_size_order = MAX_ORDER;
@@ -213,7 +213,7 @@ void *buddy_alloc(int size)
  */
 void buddy_free(void *addr)
 {
-	// Store the page index of the memory we want to free
+	// Store the page index & the order_size of the memory we want to free
 	int request_page_index = ADDR_TO_PAGE(addr),
 		request_page_order = g_pages[request_page_index].block_size_order;
 
@@ -221,31 +221,41 @@ void buddy_free(void *addr)
 	struct list_head *current;
 
 	// Check this block size and all those larger than it
-	for(; request_page_order <= MAX_ORDER; request_page_order++) {
+	// @note - this only continues if we can continue merging buddies
+	for(;; request_page_order++) {
 		temp = NULL;
 
-		// Loop
-		for(current = free_area[request_page_order].next; 
-			current != &free_area[request_page_order];
-			current = current->prev) {
-
+		// Loop through the free_area array to check our buddy
+		list_for_each(current, &free_area[request_page_order]) {
 			// Get the entry from this page
 			temp = list_entry(current, page_t, list);
-			if(!temp) {
-				g_pages[request_page_index].block_size_order = -1;
-				list_add(&g_pages[request_page_index].list, &free_area[request_page_order]);
-				return;
-			}
-			else if(temp->mem == BUDDY_ADDR(addr, request_page_order)) {
-				g_pages[request_page_index].block_size_order = -1;
-				list_add(&g_pages[request_page_index].list, &free_area[request_page_order]);
-				return;
-			}
+
+			if(temp == NULL)
+				break;
+			else if(temp->block_addr == BUDDY_ADDR(addr, request_page_order))
+				break;
+		}
+		
+		// temp is NULL
+		if(temp == NULL) {
+			g_pages[request_page_index].block_size_order = -1;
+			list_add(&g_pages[request_page_index].list, &free_area[request_page_order]);
+			return;
+		}
+		// temp's address points to our BUDDY (Buddy is free!)
+		else if(temp->block_addr != BUDDY_ADDR(addr, request_page_order)) {
+			g_pages[request_page_index].block_size_order = -1;
+			list_add(&g_pages[request_page_index].list, &free_area[request_page_order]);
+			return;
 		}
 
-		if((char*) addr > temp->mem)
-			addr = temp->mem;
-
+		// if the input address is larger than temp's address (right half), update it to smaller value
+		if((char*) addr > temp->block_addr) {
+			addr = temp->block_addr;
+			request_page_index = ADDR_TO_PAGE(addr);
+		}
+		
+		// Remove this block from free_area (it's been consumed)
 		list_del(&(temp->list));
 	}
 }
@@ -268,39 +278,3 @@ void buddy_dump()
 	}
 	printf("\n");
 }
-
-/*
-int main(int argc, char *argv[])
-{
-	char *A, *B, *C, *D;
-
-	buddy_init();
-
-	printf("Buddy initialized...\n");
- 	
-	A = buddy_alloc(80*1024);
-	buddy_dump();
-
-	B = buddy_alloc(60*1024);
-	buddy_dump();
-
-	C = buddy_alloc(80*1024);
-	buddy_dump();
-
-	buddy_free(A);
-	buddy_dump();
-
-	D = buddy_alloc(32*1024);
-	buddy_dump();
-	
-	buddy_free(B);
-	buddy_dump();
-	
-	buddy_free(D);
-	buddy_dump();
-
-	buddy_free(C);
-	buddy_dump();
-
-	return 0;
-}*/

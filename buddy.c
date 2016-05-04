@@ -126,6 +126,9 @@ void buddy_init()
  */
 void *buddy_alloc(int size)
 {
+#if USE_DEBUG
+	printf("Attempting buddy_alloc with request size of %i bytes.\n", size);
+#endif
 	// Check if out of bounds
 	if(size > (1 << MAX_ORDER) || size <= 0) {
 	#if USE_DEBUG
@@ -213,6 +216,9 @@ void *buddy_alloc(int size)
  */
 void buddy_free(void *addr)
 {
+#if USE_DEBUG
+	printf("Attempting buddy_free with request address of %p\n", addr);
+#endif
 	// Store the page index & the order_size of the memory we want to free
 	int request_page_index = ADDR_TO_PAGE(addr),
 		request_page_order = g_pages[request_page_index].block_size_order;
@@ -230,28 +236,33 @@ void buddy_free(void *addr)
 			// Get the entry from this page
 			temp = list_entry(current, page_t, list);
 
+			// If there's no free elements at this size
 			if(temp == NULL)
 				break;
+			// If we found our buddy as a free element
 			else if(temp->block_addr == BUDDY_ADDR(addr, request_page_order))
 				break;
 		}
 		
-		// temp is NULL
+		// temp is NULL (no free_area blocks of this size)
 		if(temp == NULL) {
 			g_pages[request_page_index].block_size_order = -1;
 			list_add(&g_pages[request_page_index].list, &free_area[request_page_order]);
 			return;
 		}
-		// temp's address points to our BUDDY (Buddy is free!)
+		// temp size exists, but we couldn't find our buddy
 		else if(temp->block_addr != BUDDY_ADDR(addr, request_page_order)) {
 			g_pages[request_page_index].block_size_order = -1;
 			list_add(&g_pages[request_page_index].list, &free_area[request_page_order]);
 			return;
 		}
+		// If we're at this point, we found our buddy, so we need to put them together
 
 		// if the input address is larger than temp's address (right half), update it to smaller value
 		if((char*) addr > temp->block_addr) {
 			addr = temp->block_addr;
+
+			// Update the page index to account for a change in address
 			request_page_index = ADDR_TO_PAGE(addr);
 		}
 		

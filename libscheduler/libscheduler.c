@@ -81,6 +81,27 @@ void scheduler_start_up(int cores, scheme_t scheme)
 
 
 /**
+  Determines if there are any idle cores, and if so, returns the index of the first idle core
+
+  @return index of the first idle core
+  @return -1 if no cores are available
+ */
+int scheduler_idle_core_finder()
+{
+  int i;
+  for (i = 0; i < m_cores; i++)
+  {
+    if (m_coreArr[i] == NULL)
+    {
+      return i;
+    }
+  }
+
+  return -1;
+}
+
+
+/**
   Called when a new job arrives.
  
   If multiple cores are idle, the job should be assigned to the core with the
@@ -98,7 +119,6 @@ void scheduler_start_up(int cores, scheme_t scheme)
   @param priority the priority of the job. (The lower the value, the higher the priority.)
   @return index of core job should be scheduled on
   @return -1 if no scheduling changes should be made. 
- 
  */
 int scheduler_new_job(int job_number, int time, int running_time, int priority)
 {
@@ -214,19 +234,6 @@ int scheduler_new_job(int job_number, int time, int running_time, int priority)
   return -1;
 }
 
-int scheduler_idle_core_finder(void)
-{
-  int i;
-  for (i = 0; i < m_cores; i++)
-  {
-    if (m_coreArr[i] == NULL)
-    {
-      return i;
-    }
-  }
-
-  return -1;
-}
 
 /**
   Called when a job has completed execution.
